@@ -1,6 +1,7 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AbaConfigChatwoot } from "@/components/AbaConfigChatwoot";
 import { AbaWebhooks } from "@/components/AbaWebhooks";
+import { AbaWebhooksExternos } from "@/components/AbaWebhooksExternos";
 import { AbaUsuarios } from "@/components/AbaUsuarios";
 
 import { useQuery } from "@tanstack/react-query";
@@ -34,9 +35,10 @@ const Configuracoes = () => {
         <h1 className="text-4xl font-bold mb-8">⚙️ Configurações</h1>
         
         <Tabs defaultValue="chatwoot" className="w-full">
-          <TabsList className={`grid w-full ${isMaster ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          <TabsList className={`grid w-full ${isMaster ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <TabsTrigger value="chatwoot">Chatwoot</TabsTrigger>
-            <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+            <TabsTrigger value="webhooks">Webhooks Internos</TabsTrigger>
+            <TabsTrigger value="externos">Webhooks Externos</TabsTrigger>
             {isMaster && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
           </TabsList>
 
@@ -46,6 +48,10 @@ const Configuracoes = () => {
 
           <TabsContent value="webhooks" className="mt-6">
             <AbaWebhooks />
+          </TabsContent>
+
+          <TabsContent value="externos" className="mt-6">
+            <AbaWebhooksExternos />
           </TabsContent>
 
           {isMaster && (

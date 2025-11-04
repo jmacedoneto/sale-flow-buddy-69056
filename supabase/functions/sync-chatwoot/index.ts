@@ -5,116 +5,114 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface SyncPayload {
+  conversation_id: number;
+  funil_etapa?: string;
+  data_retorno?: string;
+  etapa_comercial?: string;
+}
+
 Deno.serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('OK', { headers: corsHeaders });
   }
 
   try {
+    // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { conversation_id, nome_do_funil, funil_etapa, data_retorno } = await req.json();
-
-    console.log('[sync-chatwoot] Iniciando sincronização...');
-    console.log(`[sync-chatwoot] Conversation ID: ${conversation_id}`);
-
-    // Buscar configuração do Chatwoot
-    const { data: config, error: configError } = await supabase
+    // Get Chatwoot config
+    const { data: config } = await supabase
       .from('integracao_chatwoot')
-      .select('account_id, url')
-      .order('updated_at', { ascending: false })
-      .limit(1)
+      .select('url, account_id, api_key')
+      .eq('status', 'ativo')
       .maybeSingle();
 
-    if (configError || !config) {
-      console.error('[sync-chatwoot] Config não encontrada:', configError);
-      // Não falhar - apenas logar
+    if (!config || !config.api_key) {
+      console.error('[sync-chatwoot] No active Chatwoot config found');
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Configuração do Chatwoot não encontrada',
-          logged: true 
-        }),
+        JSON.stringify({ success: false, error: 'Chatwoot não configurado' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Parse request body
+    const payload: SyncPayload = await req.json();
+    const { conversation_id, funil_etapa, data_retorno, etapa_comercial } = payload;
+
+    if (!conversation_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'conversation_id é obrigatório' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`[sync-chatwoot] Syncing conversation ${conversation_id} to Chatwoot`);
+
+    // Build custom_attributes to update
+    const custom_attributes: Record<string, any> = {};
+
+    if (funil_etapa) {
+      custom_attributes.funil_etapa = funil_etapa;
+    }
+
+    if (data_retorno) {
+      custom_attributes.data_retorno = data_retorno;
+    }
+
+    if (etapa_comercial) {
+      custom_attributes.etapa_comercial = etapa_comercial;
+    }
+
+    // Check if there's anything to update
+    if (Object.keys(custom_attributes).length === 0) {
+      console.log('[sync-chatwoot] No attributes to update, skipping');
+      return new Response(
+        JSON.stringify({ success: true, message: 'No changes to sync' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // API Key do ambiente
-    const apiKey = Deno.env.get('CHATWOOT_API_KEY');
-    if (!apiKey) {
-      console.error('[sync-chatwoot] CHATWOOT_API_KEY não configurado');
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'CHATWOOT_API_KEY não configurado no ambiente',
-          logged: true 
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Make PUT request to Chatwoot API
+    const chatwootUrl = `${config.url}/api/v1/accounts/${config.account_id}/conversations/${conversation_id}`;
+    
+    console.log(`[sync-chatwoot] Updating Chatwoot: ${chatwootUrl}`);
+    console.log(`[sync-chatwoot] Custom attributes:`, custom_attributes);
 
-    const chatwootUrl = config.url.replace(/\/$/, ''); // Remove trailing slash
-    const accountId = config.account_id;
-
-    console.log('[sync-chatwoot] Sincronizando custom attributes...');
-
-    // Atualizar custom attributes no Chatwoot
-    const response = await fetch(
-      `${chatwootUrl}/api/v1/accounts/${accountId}/conversations/${conversation_id}/custom_attributes`,
-      {
-        method: 'POST',
-        headers: {
-          'api_access_token': apiKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          custom_attributes: {
-            nome_do_funil,
-            funil_etapa,
-            data_retorno,
-          },
-        }),
-      }
-    );
+    const response = await fetch(chatwootUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'api_access_token': config.api_key,
+      },
+      body: JSON.stringify({ custom_attributes }),
+    });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[sync-chatwoot] Erro ao atualizar Chatwoot:', errorText);
-      // Não falhar - apenas logar
+      console.error(`[sync-chatwoot] Chatwoot API error: ${response.status} - ${errorText}`);
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Erro ao atualizar Chatwoot',
-          details: errorText,
-          logged: true 
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: false, error: `Chatwoot API error: ${response.status}` }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log('[sync-chatwoot] Sincronização concluída com sucesso');
+    const result = await response.json();
+    console.log(`[sync-chatwoot] Successfully synced to Chatwoot`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        message: 'Sincronizado com Chatwoot com sucesso'
-      }),
+      JSON.stringify({ success: true, message: 'Synced to Chatwoot', data: result }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
-    console.error('[sync-chatwoot] Erro fatal:', error);
-    // Não falhar - apenas logar
+    console.error('[sync-chatwoot] Fatal error:', error);
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: String(error),
-        logged: true 
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: String(error) }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
