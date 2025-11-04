@@ -223,6 +223,45 @@ export type Database = {
         }
         Relationships: []
       }
+      mappings_config: {
+        Row: {
+          active: boolean | null
+          chatwoot_key: string
+          chatwoot_type: string
+          chatwoot_value: string | null
+          created_at: string | null
+          id: string
+          lovable_etapa: string | null
+          lovable_funil: string | null
+          ordem: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          chatwoot_key: string
+          chatwoot_type: string
+          chatwoot_value?: string | null
+          created_at?: string | null
+          id?: string
+          lovable_etapa?: string | null
+          lovable_funil?: string | null
+          ordem?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          chatwoot_key?: string
+          chatwoot_type?: string
+          chatwoot_value?: string | null
+          created_at?: string | null
+          id?: string
+          lovable_etapa?: string | null
+          lovable_funil?: string | null
+          ordem?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           criar_card: boolean | null

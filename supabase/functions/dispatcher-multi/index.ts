@@ -74,9 +74,20 @@ Deno.serve(async (req) => {
 
     const conv_id = conv.id;
 
+    // Load active mappings for intelligent correlation
+    const { data: mappingsData } = await supabase
+      .from('mappings_config')
+      .select('*')
+      .eq('active', true)
+      .order('ordem', { ascending: true });
+
+    const mappings = mappingsData || [];
+    console.log(`[dispatcher-multi] Loaded ${mappings.length} active mappings`);
+
     // Robust parsing: handle changed_attributes OR custom_attributes, arrays OR strings
     const changed_attrs = conv.changed_attributes?.custom_attrs || {};
     const custom_attrs = conv.custom_attributes || {};
+    const labels = conv.labels || [];
 
     const parseAttrValue = (key: string) => {
       // Try changed_attributes first (format: {current_value: ...})
@@ -109,21 +120,82 @@ Deno.serve(async (req) => {
       nome_do_funil,
       funil_etapa,
       data_retorno,
-      etapa_comercial
+      etapa_comercial,
+      labels
     });
+
+    // Intelligent correlation: priority order = labels > attrs > path
+    let final_funil_nome: string | null = null;
+    let final_etapa_nome: string | null = null;
+
+    // 1. Process labels first (highest priority)
+    for (const label of labels) {
+      // Split by ":" (e.g., "etapa:negociacao" -> key="negociacao")
+      const parts = label.split(':');
+      const key = parts.length > 1 ? parts[1] : label.replace(/^label_/, '');
+
+      // Find exact match in mappings
+      const map = mappings.find((m: any) => 
+        m.chatwoot_type === 'label' && 
+        m.chatwoot_key === key && 
+        (!m.chatwoot_value || m.chatwoot_value === label)
+      );
+
+      if (map) {
+        if (map.lovable_funil) final_funil_nome = map.lovable_funil;
+        if (map.lovable_etapa) final_etapa_nome = map.lovable_etapa;
+        console.log(`[dispatcher-multi] Manual match label "${label}" → funil: ${map.lovable_funil}, etapa: ${map.lovable_etapa}`);
+        break; // First match wins (highest ordem)
+      }
+    }
+
+    // 2. Process attributes (overrides labels if higher priority)
+    if (nome_do_funil) {
+      const map = mappings.find((m: any) => 
+        m.chatwoot_type === 'attr' && 
+        m.chatwoot_key === 'nome_do_funil' && 
+        (!m.chatwoot_value || m.chatwoot_value === nome_do_funil)
+      );
+
+      if (map && map.lovable_funil) {
+        final_funil_nome = map.lovable_funil;
+        console.log(`[dispatcher-multi] Manual match attr nome_do_funil="${nome_do_funil}" → funil: ${map.lovable_funil}`);
+      } else {
+        // Fallback: use attribute value directly
+        final_funil_nome = nome_do_funil;
+        console.log(`[dispatcher-multi] No map for attr nome_do_funil="${nome_do_funil}", using value directly`);
+      }
+    }
+
+    if (funil_etapa) {
+      const map = mappings.find((m: any) => 
+        m.chatwoot_type === 'attr' && 
+        m.chatwoot_key === 'funil_etapa' && 
+        (!m.chatwoot_value || m.chatwoot_value === funil_etapa)
+      );
+
+      if (map && map.lovable_etapa) {
+        final_etapa_nome = map.lovable_etapa;
+        console.log(`[dispatcher-multi] Manual match attr funil_etapa="${funil_etapa}" → etapa: ${map.lovable_etapa}`);
+      } else {
+        // Fallback: use attribute value directly
+        final_etapa_nome = funil_etapa;
+        console.log(`[dispatcher-multi] No map for attr funil_etapa="${funil_etapa}", using value directly`);
+      }
+    }
+
+    // 3. Fallback to path-based default if no mappings matched
+    if (!final_funil_nome) {
+      final_funil_nome = webhookPath.includes('Comercial') ? 'Comercial' : 'Administrativo';
+      console.log(`[dispatcher-multi] No mapping matched, using path-based default: ${final_funil_nome}`);
+    }
 
     // Process conversation_updated event
     if (event === 'conversation_updated') {
       console.log(`[dispatcher-multi] Processing conversation ${conv_id}`);
 
-      // Determine base funil from path
-      let funil_nome = webhookPath.includes('Comercial') ? 'Comercial' : 'Administrativo';
-      
-      // Override with custom attribute if provided
-      if (nome_do_funil) {
-        funil_nome = nome_do_funil;
-      }
-
+      // Use final correlated funil name
+      const funil_nome = final_funil_nome!;
       console.log(`[dispatcher-multi] Target funil: ${funil_nome}`);
 
       // Find or create funil
@@ -135,44 +207,85 @@ Deno.serve(async (req) => {
 
       let funil_created = false;
       if (!funil) {
-        console.log(`[dispatcher-multi] Auto-creating funil: ${funil_nome}`);
-        const { data: newFunil, error: insertError } = await supabase
-          .from('funis')
-          .insert({ nome: funil_nome })
-          .select('id, nome')
-          .single();
+        // Auto-create only if name is > 3 chars (avoid confusion)
+        if (funil_nome.length > 3) {
+          console.log(`[dispatcher-multi] Auto-creating funil: ${funil_nome}`);
+          const { data: newFunil, error: insertError } = await supabase
+            .from('funis')
+            .insert({ nome: funil_nome })
+            .select('id, nome')
+            .single();
 
-        if (insertError) {
-          console.error('[dispatcher-multi] Error creating funil:', insertError);
-          return new Response(
-            JSON.stringify({ error: 'Failed to create funil' }),
-            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
+          if (insertError) {
+            console.error('[dispatcher-multi] Error creating funil:', insertError);
+            
+            // Try ILIKE fallback
+            const normalized = funil_nome.toLowerCase().replace(/_/g, ' ');
+            const { data: similarFunil } = await supabase
+              .from('funis')
+              .select('id, nome')
+              .ilike('nome', `%${normalized}%`)
+              .limit(1)
+              .maybeSingle();
+
+            if (similarFunil) {
+              funil = similarFunil;
+              console.log(`[dispatcher-multi] Semi-correlate fallback: "${funil_nome}" → "${funil.nome}" (suggest adding map)`);
+            } else {
+              // Use default
+              const { data: defaultFunil } = await supabase
+                .from('funis')
+                .select('id, nome')
+                .eq('nome', 'Padrão')
+                .maybeSingle();
+
+              funil = defaultFunil || { id: null, nome: 'Padrão' };
+              console.log(`[dispatcher-multi] Confuso "${funil_nome}" (create failed) → default "Padrão" (suggest map)`);
+            }
+          } else {
+            funil = newFunil;
+            funil_created = true;
+          }
+        } else {
+          // Too short, use default
+          const { data: defaultFunil } = await supabase
+            .from('funis')
+            .select('id, nome')
+            .eq('nome', 'Padrão')
+            .maybeSingle();
+
+          funil = defaultFunil || { id: null, nome: 'Padrão' };
+          console.log(`[dispatcher-multi] Confuso "${funil_nome}" (too short) → default "Padrão" (suggest map)`);
         }
+      }
 
-        funil = newFunil;
-        funil_created = true;
+      if (!funil) {
+        console.error('[dispatcher-multi] Failed to resolve funil, skipping');
+        return new Response(
+          JSON.stringify({ error: 'Failed to resolve funil' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       console.log(`[dispatcher-multi] Funil resolved: ${funil.nome} (id: ${funil.id}, created: ${funil_created})`);
 
-      // Handle etapa
+      // Handle etapa with intelligent correlation
       let etapa_id = null;
-      let etapa_nome = funil_etapa;
+      let etapa_nome = final_etapa_nome || funil_etapa;
       let etapa_created = false;
       let is_default = false;
 
-      if (funil_etapa) {
+      if (etapa_nome) {
         // Find or create specific etapa
         let { data: etapa } = await supabase
           .from('etapas')
           .select('id, nome')
           .eq('funil_id', funil.id)
-          .eq('nome', funil_etapa)
+          .eq('nome', etapa_nome)
           .maybeSingle();
 
-        if (!etapa) {
-          // Get max ordem for this funil
+        if (!etapa && etapa_nome.length > 3) {
+          // Auto-create etapa if name is reasonable
           const { data: maxOrdem } = await supabase
             .from('etapas')
             .select('ordem')
@@ -183,15 +296,29 @@ Deno.serve(async (req) => {
 
           const nextOrdem = (maxOrdem?.ordem || 0) + 1;
 
-          console.log(`[dispatcher-multi] Auto-creating etapa: ${funil_etapa} (ordem: ${nextOrdem})`);
+          console.log(`[dispatcher-multi] Auto-creating etapa: ${etapa_nome} (ordem: ${nextOrdem})`);
           const { data: newEtapa, error: etapaError } = await supabase
             .from('etapas')
-            .insert({ funil_id: funil.id, nome: funil_etapa, ordem: nextOrdem })
+            .insert({ funil_id: funil.id, nome: etapa_nome, ordem: nextOrdem })
             .select('id, nome')
             .single();
 
           if (etapaError) {
             console.error('[dispatcher-multi] Error creating etapa:', etapaError);
+            // Try ILIKE fallback
+            const normalized = etapa_nome.toLowerCase().replace(/_/g, ' ');
+            const { data: similarEtapa } = await supabase
+              .from('etapas')
+              .select('id, nome')
+              .eq('funil_id', funil.id)
+              .ilike('nome', `%${normalized}%`)
+              .limit(1)
+              .maybeSingle();
+
+            if (similarEtapa) {
+              etapa = similarEtapa;
+              console.log(`[dispatcher-multi] Semi-correlate etapa: "${etapa_nome}" → "${etapa.nome}" (suggest map)`);
+            }
           } else {
             etapa = newEtapa;
             etapa_created = true;
@@ -202,8 +329,10 @@ Deno.serve(async (req) => {
           etapa_id = etapa.id;
           etapa_nome = etapa.nome;
         }
-      } else {
-        // Use default first etapa
+      }
+
+      // Use default first etapa if none specified
+      if (!etapa_id) {
         const { data: defaultEtapa } = await supabase
           .from('etapas')
           .select('id, nome')
