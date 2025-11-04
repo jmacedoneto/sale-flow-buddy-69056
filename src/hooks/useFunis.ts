@@ -1,0 +1,492 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import type { Funil, Etapa, CardConversa } from "@/types/database";
+import { computarStatusTarefa, type StatusInfo } from "@/services/cardStatusService";
+
+export const useFunis = () => {
+  return useQuery<Funil[]>({
+    queryKey: ["funis"],
+    queryFn: async () => {
+      const { data, error } = await (supabase as any)
+        .from("funis")
+        .select("*")
+        .order("nome");
+      
+      if (error) throw error;
+      return (data || []) as Funil[];
+    },
+  });
+};
+
+export const useEtapas = (funilId: string | null) => {
+  return useQuery<Etapa[]>({
+    queryKey: ["etapas", funilId],
+    queryFn: async () => {
+      if (!funilId) return [];
+      
+      const { data, error } = await (supabase as any)
+        .from("etapas")
+        .select("*")
+        .eq("funil_id", funilId)
+        .order("ordem");
+      
+      if (error) throw error;
+      return (data || []) as Etapa[];
+    },
+    enabled: !!funilId,
+  });
+};
+
+export const useCardsConversas = (etapaId: string | null) => {
+  return useQuery<CardConversa[]>({
+    queryKey: ["cards_conversas", etapaId],
+    queryFn: async () => {
+      if (!etapaId) return [];
+      
+      const { data, error } = await (supabase as any)
+        .from("cards_conversas")
+        .select("*")
+        .eq("etapa_id", etapaId)
+        .order("created_at", { ascending: false });
+      
+      if (error) throw error;
+      return (data || []) as CardConversa[];
+    },
+    enabled: !!etapaId,
+  });
+};
+
+export interface CardWithStatus extends CardConversa {
+  statusInfo: StatusInfo;
+}
+
+export const useAllCardsForFunil = (funilId: string | null, page: number = 0, pageSize: number = 50) => {
+  return useQuery<{ cards: CardWithStatus[]; totalCount: number }>({
+    queryKey: ["all_cards", funilId, page],
+    queryFn: async () => {
+      if (!funilId) return { cards: [], totalCount: 0 };
+      
+      // Buscar total count
+      const { count } = await supabase
+        .from("cards_conversas")
+        .select(`
+          *,
+          etapas!inner (
+            funil_id
+          )
+        `, { count: 'exact', head: true })
+        .eq("etapas.funil_id", funilId);
+      
+      // Buscar dados paginados
+      const start = page * pageSize;
+      const end = start + pageSize - 1;
+      
+      const { data, error } = await (supabase as any)
+        .from("cards_conversas")
+        .select(`
+          *,
+          etapas!inner (
+            funil_id
+          )
+        `)
+        .eq("etapas.funil_id", funilId)
+        .order("created_at", { ascending: false })
+        .range(start, end);
+      
+      if (error) throw error;
+      
+      // Computar status de tarefa usando o serviço
+      const cardsComStatus = (data || []).map((card: any) => ({
+        ...card,
+        statusInfo: computarStatusTarefa(card.data_retorno)
+      } as CardWithStatus));
+
+      return {
+        cards: cardsComStatus,
+        totalCount: count || 0
+      };
+    },
+    enabled: !!funilId,
+  });
+};
+
+export const useMoveCard = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      cardId, 
+      newEtapaId,
+      oldEtapaNome,
+      newEtapaNome 
+    }: { 
+      cardId: string; 
+      newEtapaId: string;
+      oldEtapaNome?: string;
+      newEtapaNome?: string;
+    }) => {
+      // Atualizar etapa do card
+      const { data: card, error: updateError } = await (supabase as any)
+        .from("cards_conversas")
+        .update({ etapa_id: newEtapaId })
+        .eq("id", cardId)
+        .select()
+        .single();
+      
+      if (updateError) throw updateError;
+
+      // Criar registro de atividade
+      const descricao = oldEtapaNome && newEtapaNome 
+        ? `Card movido de "${oldEtapaNome}" para "${newEtapaNome}"`
+        : "Card movido para outra etapa";
+
+      const { error: atividadeError } = await (supabase as any)
+        .from("atividades_cards")
+        .insert({
+          card_id: cardId,
+          tipo: "MUDANCA_ETAPA",
+          descricao,
+        });
+      
+      if (atividadeError) console.error("Erro ao criar atividade:", atividadeError);
+      
+      return card;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all_cards"] });
+      queryClient.invalidateQueries({ queryKey: ["atividades"] });
+      toast.success("Card movido com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao mover card:", error);
+      toast.error("Erro ao mover card. Tente novamente.");
+    },
+  });
+};
+
+export const useUpdateCard = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: any }) => {
+      const { data, error } = await (supabase as any)
+        .from("cards_conversas")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as CardConversa;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all_cards"] });
+      queryClient.invalidateQueries({ queryKey: ["cards_conversas"] });
+      toast.success("Card atualizado com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao atualizar card:", error);
+      toast.error("Erro ao atualizar card. Tente novamente.");
+    },
+  });
+};
+
+export const useCreateCard = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      titulo, 
+      etapa_id, 
+      resumo, 
+      prazo, 
+      prioridade,
+      funil_id,
+      funil_nome,
+      funil_etapa,
+      data_retorno,
+    }: { 
+      titulo: string; 
+      etapa_id: string; 
+      resumo?: string | null;
+      prazo?: string | null;
+      prioridade?: string | null;
+      funil_id?: string | null;
+      funil_nome?: string | null;
+      funil_etapa?: string | null;
+      data_retorno?: string | null;
+    }) => {
+      // Inserir novo card
+      const { data: card, error: insertError } = await (supabase as any)
+        .from("cards_conversas")
+        .insert({
+          titulo,
+          etapa_id,
+          resumo,
+          prazo,
+          prioridade,
+          funil_id,
+          funil_nome,
+          funil_etapa,
+          data_retorno: data_retorno || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+        })
+        .select()
+        .single();
+      
+      if (insertError) throw insertError;
+
+      // Criar registro de atividade de criação
+      const { error: atividadeError } = await (supabase as any)
+        .from("atividades_cards")
+        .insert({
+          card_id: card.id,
+          tipo: "CRIACAO",
+          descricao: "Card criado manualmente",
+        });
+      
+      if (atividadeError) console.error("Erro ao criar atividade:", atividadeError);
+      
+      return card as CardConversa;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["all_cards"] });
+      queryClient.invalidateQueries({ queryKey: ["cards_conversas"] });
+      queryClient.invalidateQueries({ queryKey: ["atividades"] });
+      toast.success("Card criado com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao criar card:", error);
+      toast.error("Erro ao criar card. Tente novamente.");
+    },
+  });
+};
+
+export const useCreateFunil = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ nome }: { nome: string }) => {
+      const { data, error } = await (supabase as any)
+        .from("funis")
+        .insert({ nome })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as Funil;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["funis"] });
+      toast.success("Funil criado com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao criar funil:", error);
+      toast.error("Erro ao criar funil. Tente novamente.");
+    },
+  });
+};
+
+export const useUpdateFunil = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, nome }: { id: string; nome: string }) => {
+      const { data, error } = await (supabase as any)
+        .from("funis")
+        .update({ nome })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Funil;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["funis"] });
+      toast.success("Funil atualizado com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao atualizar funil:", error);
+      toast.error("Erro ao atualizar funil. Tente novamente.");
+    },
+  });
+};
+
+export const useDeleteFunil = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (funilId: string) => {
+      // Primeiro, verificar se há cards associados
+      const { data: cards, error: cardsError } = await (supabase as any)
+        .from("cards_conversas")
+        .select("id, etapas!inner(funil_id)")
+        .eq("etapas.funil_id", funilId);
+      
+      if (cardsError) throw cardsError;
+      
+      if (cards && cards.length > 0) {
+        throw new Error("Não é possível deletar um funil com cards associados");
+      }
+
+      // Deletar etapas primeiro (cascade)
+      const { error: etapasError } = await (supabase as any)
+        .from("etapas")
+        .delete()
+        .eq("funil_id", funilId);
+      
+      if (etapasError) throw etapasError;
+
+      // Deletar funil
+      const { error: funilError } = await (supabase as any)
+        .from("funis")
+        .delete()
+        .eq("id", funilId);
+      
+      if (funilError) throw funilError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["funis"] });
+      queryClient.invalidateQueries({ queryKey: ["etapas"] });
+      toast.success("Funil deletado com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao deletar funil:", error);
+      if (error.message.includes("cards associados")) {
+        toast.error("Não é possível deletar um funil com cards associados");
+      } else {
+        toast.error("Erro ao deletar funil. Tente novamente.");
+      }
+    },
+  });
+};
+
+export const useCreateEtapa = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ funilId, nome, ordem }: { funilId: string; nome: string; ordem: number }) => {
+      const { data, error } = await (supabase as any)
+        .from("etapas")
+        .insert({ 
+          funil_id: funilId,
+          nome,
+          ordem 
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as Etapa;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["etapas"] });
+      toast.success("Etapa criada com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao criar etapa:", error);
+      toast.error("Erro ao criar etapa. Tente novamente.");
+    },
+  });
+};
+
+export const useUpdateEtapa = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, nome }: { id: string; nome: string }) => {
+      const { data, error } = await (supabase as any)
+        .from("etapas")
+        .update({ nome })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as Etapa;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["etapas"] });
+      toast.success("Etapa atualizada com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao atualizar etapa:", error);
+      toast.error("Erro ao atualizar etapa. Tente novamente.");
+    },
+  });
+};
+
+export const useDeleteEtapa = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (etapaId: string) => {
+      // Verificar se há cards associados
+      const { data: cards, error: cardsError } = await (supabase as any)
+        .from("cards_conversas")
+        .select("id")
+        .eq("etapa_id", etapaId);
+      
+      if (cardsError) throw cardsError;
+      
+      if (cards && cards.length > 0) {
+        throw new Error("Não é possível deletar uma etapa com cards associados");
+      }
+
+      // Deletar etapa
+      const { error } = await (supabase as any)
+        .from("etapas")
+        .delete()
+        .eq("id", etapaId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["etapas"] });
+      toast.success("Etapa deletada com sucesso!");
+    },
+    onError: (error) => {
+      console.error("Erro ao deletar etapa:", error);
+      if (error.message.includes("cards associados")) {
+        toast.error("Não é possível deletar uma etapa com cards associados");
+      } else {
+        toast.error("Erro ao deletar etapa. Tente novamente.");
+      }
+    },
+  });
+};
+
+export const useReorderEtapas = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ updates }: { updates: { id: string; ordem: number }[] }) => {
+      // Atualizar ordem de cada etapa
+      const promises = updates.map(({ id, ordem }) => 
+        (supabase as any)
+          .from("etapas")
+          .update({ ordem })
+          .eq("id", id)
+      );
+      
+      const results = await Promise.all(promises);
+      
+      // Verificar se houve algum erro
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) {
+        throw errors[0].error;
+      }
+      
+      return results;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["etapas"] });
+      toast.success("Ordem das etapas atualizada!");
+    },
+    onError: (error) => {
+      console.error("Erro ao reordenar etapas:", error);
+      toast.error("Erro ao reordenar etapas. Tente novamente.");
+    },
+  });
+};

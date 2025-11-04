@@ -1,0 +1,68 @@
+/**
+ * Tipos auxiliares para contornar problema com types.ts auto-gerado.
+ * Remove quando types.ts for regenerado corretamente.
+ */
+
+export interface CardConversa {
+  id: string;
+  funil_id?: string;
+  funil_nome?: string;
+  funil_etapa?: string;
+  data_retorno?: string | null;
+  chatwoot_conversa_id?: number | null;
+  titulo?: string;
+  resumo?: string;
+  created_at?: string;
+  updated_at?: string;
+  prazo?: string | null;
+  prioridade?: string | null;
+  descricao_detalhada?: string | null;
+  resumo_comercial?: string | null;
+  etapa_id?: string;
+}
+
+export interface Funil {
+  id: string;
+  nome: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Etapa {
+  id: string;
+  funil_id: string;
+  nome: string;
+  ordem: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AtividadeCard {
+  id: string;
+  card_id: string;
+  tipo: string;
+  descricao: string;
+  data_criacao: string;
+}
+
+export interface IntegracaoChatwoot {
+  id: string;
+  url: string;
+  api_key: string;
+  account_id: number;
+  label: string;
+  status: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface WebhookConfig {
+  id: string;
+  nome: string;
+  evento_chatwoot: string;
+  acao: string;
+  ativo: boolean;
+  config_adicional?: any;
+  created_at?: string;
+  updated_at?: string;
+}
