@@ -1,1 +1,4 @@
 project_id = "sjrmpojssvfgquroywys"
+
+[functions.dispatcher-multi]
+verify_jwt = false
