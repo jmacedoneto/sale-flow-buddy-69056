@@ -108,16 +108,16 @@ export const AbaMappings = () => {
     <div className="space-y-6">
       <Alert className="border-primary/20 bg-primary/5">
         <AlertCircle className="h-4 w-4 text-primary" />
-        <AlertTitle>⚠️ IMPORTANTE: Labels Definem Funil</AlertTitle>
+        <AlertTitle>📋 Regras de Sincronização (Label-First)</AlertTitle>
         <AlertDescription className="space-y-2">
           <p className="font-medium">
-            A partir de agora, <strong>APENAS LABELS</strong> definem o funil de destino do card.
+            <strong>1. Labels definem funil</strong> – Toda conversa precisa de label mapeada para definir funil de destino.
           </p>
           <p className="text-sm">
-            Prioridade: <strong>Labels → Path da Inbox → Default "Padrão"</strong>
+            <strong>2. Atributos refinam etapa</strong> – Use <code>etapa_comercial</code> (funil Comercial) ou <code>funil_etapa</code> (funis Admin) para definir etapa dentro do funil.
           </p>
           <p className="text-sm text-muted-foreground">
-            Atributo "nome_do_funil" está depreciado e foi desativado. Use as labels configuradas abaixo.
+            ⚠️ Conversas sem label mapeada são rejeitadas com warning no log (atributos sozinhos não criam cards).
           </p>
         </AlertDescription>
       </Alert>
@@ -236,8 +236,8 @@ export const AbaMappings = () => {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="label">Label (recomendado)</SelectItem>
-                  <SelectItem value="attr">Attr (depreciado)</SelectItem>
+                  <SelectItem value="label">Label – Define funil/fluxo principal</SelectItem>
+                  <SelectItem value="attr">Attr – Refina etapa/detalhes (complementar)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
