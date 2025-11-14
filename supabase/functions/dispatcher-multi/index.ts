@@ -108,6 +108,12 @@ Deno.serve(async (req) => {
     const webhookPath = decodeURIComponent(pathSegments[pathSegments.length - 1]);
     
     console.log(`[dispatcher-multi] Webhook path: ${webhookPath}`);
+    console.log(`[dispatcher-multi] Request method: ${req.method}`);
+    console.log(`[dispatcher-multi] Full URL: ${req.url}`);
+    console.log(`[dispatcher-multi] Headers:`, Object.fromEntries(req.headers.entries()));
+    
+    const contentType = req.headers.get('content-type');
+    console.log(`[dispatcher-multi] Content-Type: ${contentType}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -141,24 +147,81 @@ Deno.serve(async (req) => {
       );
     }
 
-    const payload: WebhookPayload = await req.json();
-    eventType = payload.event;
-    const conv = payload.conversation;
+    // Tentar extrair payload de múltiplos formatos
+    let payload: WebhookPayload | null = null;
+    const method = req.method;
 
-    if (!conv?.id) {
+    // Formato 1: POST com JSON body
+    if (method === 'POST' && contentType?.includes('application/json')) {
+      try {
+        const body = await req.text();
+        console.log(`[dispatcher-multi] Raw body length: ${body.length}`);
+        console.log(`[dispatcher-multi] Raw body preview: ${body.substring(0, 500)}`);
+        
+        if (body && body.trim().length > 0) {
+          payload = JSON.parse(body);
+          console.log(`[dispatcher-multi] Payload parseado do body JSON`);
+        }
+      } catch (e) {
+        console.error(`[dispatcher-multi] Erro ao parsear JSON:`, e);
+      }
+    }
+
+    // Formato 2: Query parameters (GET ou POST sem body válido)
+    if (!payload) {
+      const params = url.searchParams;
+      console.log(`[dispatcher-multi] Query params:`, Object.fromEntries(params.entries()));
+      
+      if (params.has('event') || params.has('conversation_id')) {
+        const customAttrs = params.get('custom_attributes');
+        payload = {
+          event: params.get('event') || 'unknown',
+          conversation: {
+            id: parseInt(params.get('conversation_id') || '0'),
+            labels: params.get('labels')?.split(',').filter(l => l) || [],
+            custom_attributes: customAttrs ? JSON.parse(customAttrs) : {},
+          }
+        };
+        console.log(`[dispatcher-multi] Payload reconstruído dos query params`);
+      }
+    }
+
+    // Validar payload
+    if (!payload || !payload.conversation?.id) {
+      console.error(`[dispatcher-multi] Payload inválido ou ausente`);
+      console.log(`[dispatcher-multi] Payload recebido:`, JSON.stringify(payload));
+      
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
-        status: 'warning',
-        event_type: eventType,
-        error_message: 'Conversation ID ausente',
+        status: 'error',
+        event_type: payload?.event || 'unknown',
+        error_message: 'Payload inválido ou conversation_id ausente',
         latency_ms: Date.now() - startTime,
+        payload: {
+          method,
+          url: req.url,
+          headers: Object.fromEntries(req.headers.entries()),
+          receivedPayload: payload,
+        },
       });
 
       return new Response(
-        JSON.stringify({ success: true, message: 'No conversation ID' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: 'Invalid payload', 
+          details: 'No valid conversation data received',
+          debug: {
+            method,
+            hasPayload: !!payload,
+            hasConversation: !!payload?.conversation,
+            hasId: !!payload?.conversation?.id,
+          }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    eventType = payload.event;
+    const conv = payload.conversation;
 
     conversationId = conv.id;
 
