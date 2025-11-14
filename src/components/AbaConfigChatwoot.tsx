@@ -253,24 +253,6 @@ export const AbaConfigChatwoot = () => {
 
   const isFormValid = formData.url && formData.account_id && formData.api_key;
 
-  const projectId = "tlbnjicthmljpcnwjuup";
-  const webhooks = [
-    {
-      name: "Meu Comercial",
-      path: "Meu%20Comercial",
-      funil: "Comercial",
-      description: "Webhook para funil Comercial (sync: nome_do_funil, etapa_comercial, funil_etapa, data_retorno)",
-      proxyUrl: "https://evolution.apvsiguatemi.net/chatwoot/webhook/Meu%20Comercial",
-    },
-    {
-      name: "Atendimento Regional",
-      path: "Atendimento%20Regional",
-      funil: "Admin Regional",
-      description: "Webhook para funil Admin Regional (sync: nome_do_funil, funil_etapa, data_retorno)",
-      proxyUrl: "https://evolution.apvsiguatemi.net/chatwoot/webhook/Atendimento%20Regional",
-    },
-  ];
-
   return (
     <div className="space-y-6">
       <Card className="bg-muted/30">
@@ -425,71 +407,6 @@ export const AbaConfigChatwoot = () => {
         </div>
       </CardContent>
     </Card>
-
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Webhook className="h-5 w-5" />
-          Webhooks Configurados
-        </CardTitle>
-        <CardDescription>
-          URLs de webhook específicas para cada inbox do Chatwoot
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {webhooks.map((webhook) => (
-          <Alert key={webhook.path}>
-            <AlertDescription className="space-y-2">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <div className="font-semibold flex items-center gap-2">
-                    {webhook.name}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      → Funil: {webhook.funil}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{webhook.description}</p>
-                </div>
-              </div>
-              
-              <div className="space-y-2 mt-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">URL Proxy (Chatwoot):</span>
-                  <a
-                    href={webhook.proxyUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline flex items-center gap-1"
-                  >
-                    {webhook.proxyUrl}
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium">URL Direct (Supabase):</span>
-                  <code className="text-xs bg-muted px-2 py-1 rounded">
-                    https://{projectId}.supabase.co/functions/v1/dispatcher-multi/{webhook.path}
-                  </code>
-                </div>
-              </div>
-            </AlertDescription>
-          </Alert>
-        ))}
-        
-        <Alert>
-          <AlertDescription className="text-sm">
-            <strong>Instruções:</strong> Em Chatwoot → Settings → Integrations → Webhooks:
-            <ul className="list-disc list-inside mt-2 space-y-1 text-muted-foreground">
-              <li>Adicione/Edite webhook para cada inbox acima</li>
-              <li>Use as URLs proxy listadas acima</li>
-              <li>Events: <code className="bg-muted px-1 rounded">conversation_updated</code>, <code className="bg-muted px-1 rounded">message_created</code></li>
-              <li>Active: Yes</li>
-            </ul>
-          </AlertDescription>
-        </Alert>
-      </CardContent>
-    </Card>
-    </div>
+  </div>
   );
 };
