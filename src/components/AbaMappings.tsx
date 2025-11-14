@@ -101,252 +101,222 @@ export const AbaMappings = () => {
     setIsDialogOpen(true);
   };
 
+  const activeMappings = mappings.filter(m => m.active);
+  const inactiveMappings = mappings.filter(m => !m.active);
+
   return (
     <div className="space-y-6">
-      <Alert>
-        <AlertCircle className="h-4 w-4" />
-        <AlertTitle>Correlação Inteligente Labels/Attrs</AlertTitle>
-        <AlertDescription>
-          Configure matches exatos para evitar confusão automática. Edge prioriza: 
-          <strong> Exact Match → ILIKE Similarity → Auto-Create ({">"} 3 chars) → Default</strong>.
-          Mappings ativos são usados instantaneamente pelos webhooks.
+      <Alert className="border-primary/20 bg-primary/5">
+        <AlertCircle className="h-4 w-4 text-primary" />
+        <AlertTitle>⚠️ IMPORTANTE: Labels Definem Funil</AlertTitle>
+        <AlertDescription className="space-y-2">
+          <p className="font-medium">
+            A partir de agora, <strong>APENAS LABELS</strong> definem o funil de destino do card.
+          </p>
+          <p className="text-sm">
+            Prioridade: <strong>Labels → Path da Inbox → Default "Padrão"</strong>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Atributo "nome_do_funil" está depreciado e foi desativado. Use as labels configuradas abaixo.
+          </p>
         </AlertDescription>
       </Alert>
 
       <Card>
         <CardHeader>
-          <CardTitle>Mappings Chatwoot → Funil/Etapa</CardTitle>
-          <CardDescription>
-            Adicione correlações exatas entre labels/attributes do Chatwoot e funis/etapas do CRM.
-            Use para labels como "comercial" → Funil "Comercial", ou attrs como "nome_do_funil=Evento Colisão".
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Adicionar Mapping
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Mappings Ativos (Labels → Funil/Etapa)</CardTitle>
+              <CardDescription>
+                Correlações ativas usadas pelo dispatcher-multi para converter eventos do Chatwoot em cards
+              </CardDescription>
+            </div>
+            <Button onClick={() => setIsDialogOpen(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Nova Correlação
             </Button>
           </div>
-
+        </CardHeader>
+        <CardContent>
           {isLoading ? (
-            <p className="text-muted-foreground">Carregando...</p>
-          ) : mappings.length === 0 ? (
-            <p className="text-muted-foreground">Nenhum mapping configurado.</p>
+            <p>Carregando...</p>
+          ) : activeMappings.length === 0 ? (
+            <p className="text-muted-foreground">Nenhum mapping ativo configurado.</p>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Chave Chatwoot</TableHead>
-                  <TableHead>Valor</TableHead>
-                  <TableHead>Funil Lovable</TableHead>
-                  <TableHead>Etapa</TableHead>
+                  <TableHead>Valor (se attr)</TableHead>
+                  <TableHead>→ Funil Lovable</TableHead>
+                  <TableHead>→ Etapa Lovable</TableHead>
                   <TableHead>Ordem</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {mappings.map((mapping) => (
-                  <TableRow key={mapping.id}>
+                {activeMappings.map((mapping) => (
+                  <TableRow key={mapping.id} className={mapping.chatwoot_type === 'label' ? 'bg-primary/5' : ''}>
                     <TableCell>
-                      <span className={mapping.chatwoot_type === 'label' ? 'text-blue-600' : 'text-purple-600'}>
-                        {mapping.chatwoot_type}
+                      <span className={`px-2 py-1 rounded text-xs font-medium ${
+                        mapping.chatwoot_type === 'label' 
+                          ? 'bg-primary text-primary-foreground' 
+                          : 'bg-muted text-muted-foreground line-through'
+                      }`}>
+                        {mapping.chatwoot_type === 'label' ? 'Label' : 'Attr (deprecated)'}
                       </span>
                     </TableCell>
                     <TableCell className="font-mono text-sm">{mapping.chatwoot_key}</TableCell>
-                    <TableCell className="font-mono text-sm">{mapping.chatwoot_value || '-'}</TableCell>
-                    <TableCell>{mapping.lovable_funil || '-'}</TableCell>
-                    <TableCell>{mapping.lovable_etapa || '-'}</TableCell>
-                    <TableCell>{mapping.ordem}</TableCell>
-                    <TableCell>
-                      <span className={mapping.active ? "text-green-600" : "text-gray-400"}>
-                        {mapping.active ? 'Ativo' : 'Inativo'}
-                      </span>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {mapping.chatwoot_value || '—'}
                     </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(mapping)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm(`Deletar mapping "${mapping.chatwoot_key}"?`)) {
-                              deleteMapping(mapping.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
+                    <TableCell className="font-medium">{mapping.lovable_funil || '—'}</TableCell>
+                    <TableCell className="font-medium">{mapping.lovable_etapa || '—'}</TableCell>
+                    <TableCell>{mapping.ordem}</TableCell>
+                    <TableCell className="text-right space-x-2">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleEdit(mapping)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm('Deletar este mapping?')) {
+                            deleteMapping(mapping.id);
+                          }
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+
+          {inactiveMappings.length > 0 && (
+            <details className="mt-6">
+              <summary className="cursor-pointer text-sm text-muted-foreground font-medium">
+                📦 Mappings Inativos/Depreciados ({inactiveMappings.length})
+              </summary>
+              <div className="mt-2 text-xs text-muted-foreground space-y-1">
+                {inactiveMappings.map(m => (
+                  <div key={m.id} className="opacity-50">
+                    {m.chatwoot_type} | {m.chatwoot_key} → {m.lovable_funil || m.lovable_etapa}
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Como Funciona</CardTitle>
-        </CardHeader>
-        <CardContent className="prose prose-sm max-w-none">
-          <ul className="space-y-2">
-            <li><strong>Labels:</strong> Ex: "comercial" → Funil "Comercial", "etapa:negociacao" (split :) → Etapa "Negociação"</li>
-            <li><strong>Attrs:</strong> Ex: "nome_do_funil" + valor "Evento Colisão" → Funil "Evento Colisão"</li>
-            <li><strong>Ordem:</strong> 1 = alta prioridade (verificado primeiro), maior número = menor prioridade</li>
-            <li><strong>Valor null:</strong> Match qualquer valor para aquela chave (ex: label "comercial" sem valor específico)</li>
-            <li><strong>Fallback:</strong> Se não houver match exato, edge tenta ILIKE similarity → auto-create → default "Padrão"</li>
-          </ul>
-        </CardContent>
-      </Card>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Editar Mapping' : 'Novo Mapping'}</DialogTitle>
+            <DialogDescription>
+              Configure a correlação entre Chatwoot (label/attr) e Lovable (funil/etapa).
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <Label>Tipo</Label>
+              <Select
+                value={formData.chatwoot_type}
+                onValueChange={(val) => setFormData({ ...formData, chatwoot_type: val as 'label' | 'attr' })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="label">Label (recomendado)</SelectItem>
+                  <SelectItem value="attr">Attr (depreciado)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-      <Dialog open={isDialogOpen} onOpenChange={(open) => {
-        setIsDialogOpen(open);
-        if (!open) resetForm();
-      }}>
-        <DialogContent className="max-w-2xl">
-          <form onSubmit={handleSubmit}>
-            <DialogHeader>
-              <DialogTitle>
-                {editingId ? 'Editar Mapping' : 'Adicionar Mapping'}
-              </DialogTitle>
-              <DialogDescription>
-                Configure a correlação entre label/attr do Chatwoot e funil/etapa do CRM.
-              </DialogDescription>
-            </DialogHeader>
+            <div>
+              <Label>Chave Chatwoot *</Label>
+              <Input
+                value={formData.chatwoot_key}
+                onChange={(e) => setFormData({ ...formData, chatwoot_key: e.target.value })}
+                placeholder="Ex: comercial, funil_etapa"
+              />
+            </div>
 
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="type">Tipo *</Label>
-                <Select
-                  value={formData.chatwoot_type}
-                  onValueChange={(val: 'label' | 'attr') => 
-                    setFormData({ ...formData, chatwoot_type: val })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="label">Label</SelectItem>
-                    <SelectItem value="attr">Attribute</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-sm text-muted-foreground">
-                  Label: de conversation.labels[]; Attr: de conversation.custom_attributes
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="key">Chave Chatwoot *</Label>
+            {formData.chatwoot_type === 'attr' && (
+              <div>
+                <Label>Valor do Atributo</Label>
                 <Input
-                  id="key"
-                  placeholder={formData.chatwoot_type === 'label' ? 'Ex: comercial, etapa_negociacao' : 'Ex: nome_do_funil, funil_etapa'}
-                  value={formData.chatwoot_key}
-                  onChange={(e) => setFormData({ ...formData, chatwoot_key: e.target.value })}
-                  required
-                />
-                <p className="text-sm text-muted-foreground">
-                  {formData.chatwoot_type === 'label' 
-                    ? 'Será feito split por ":" (ex: "etapa:negociacao" → key="negociacao")'
-                    : 'Nome exato do custom attribute'}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="value">Valor Específico (Opcional)</Label>
-                <Input
-                  id="value"
-                  placeholder="Ex: Comercial, Em Fechamento (deixe vazio para match any)"
                   value={formData.chatwoot_value}
                   onChange={(e) => setFormData({ ...formData, chatwoot_value: e.target.value })}
+                  placeholder="Ex: Comercial, Admin Regional"
                 />
-                <p className="text-sm text-muted-foreground">
-                  Se preenchido, faz match exato chave+valor. Vazio = match qualquer valor.
-                </p>
               </div>
+            )}
 
-              <div className="space-y-2">
-                <Label htmlFor="funil">Funil Lovable</Label>
-                <Select
-                  value={formData.lovable_funil}
-                  onValueChange={(val) => setFormData({ ...formData, lovable_funil: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um funil" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Nenhum</SelectItem>
-                    {funis.map((funil) => (
-                      <SelectItem key={funil} value={funil}>
-                        {funil}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label>Funil Lovable</Label>
+              <Select
+                value={formData.lovable_funil}
+                onValueChange={(val) => setFormData({ ...formData, lovable_funil: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione um funil" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhum</SelectItem>
+                  {funis.map((f) => (
+                    <SelectItem key={f} value={f}>{f}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="etapa">Etapa</Label>
-                <Select
-                  value={formData.lovable_etapa}
-                  onValueChange={(val) => setFormData({ ...formData, lovable_etapa: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione uma etapa" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Nenhuma</SelectItem>
-                    {etapas.map((etapa) => (
-                      <SelectItem key={etapa} value={etapa}>
-                        {etapa}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div>
+              <Label>Etapa Lovable</Label>
+              <Select
+                value={formData.lovable_etapa}
+                onValueChange={(val) => setFormData({ ...formData, lovable_etapa: val })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma etapa" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Nenhuma</SelectItem>
+                  {etapas.map((e) => (
+                    <SelectItem key={e} value={e}>{e}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="ordem">Ordem de Prioridade</Label>
-                <Input
-                  id="ordem"
-                  type="number"
-                  min="0"
-                  value={formData.ordem}
-                  onChange={(e) => setFormData({ ...formData, ordem: parseInt(e.target.value) || 0 })}
-                />
-                <p className="text-sm text-muted-foreground">
-                  1 = alta prioridade (verificado primeiro), valores maiores = menor prioridade
-                </p>
-              </div>
+            <div>
+              <Label>Ordem</Label>
+              <Input
+                type="number"
+                value={formData.ordem}
+                onChange={(e) => setFormData({ ...formData, ordem: parseInt(e.target.value) })}
+              />
+            </div>
 
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="active"
-                  checked={formData.active}
-                  onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
-                />
-                <Label htmlFor="active" className="cursor-pointer">
-                  Mapping Ativo
-                </Label>
-              </div>
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={formData.active}
+                onCheckedChange={(checked) => setFormData({ ...formData, active: checked })}
+              />
+              <Label>Ativo</Label>
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => {
-                setIsDialogOpen(false);
-                resetForm();
-              }}>
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button type="submit">

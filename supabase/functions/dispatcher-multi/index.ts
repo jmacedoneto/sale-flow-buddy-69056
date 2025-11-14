@@ -108,7 +108,6 @@ Deno.serve(async (req) => {
       return val;
     };
 
-    const nomeFunil = parseAttrValue('nome_do_funil');
     const funilEtapa = parseAttrValue('funil_etapa');
     const dataRetorno = parseAttrValue('data_retorno');
     const etapaComercial = parseAttrValue('etapa_comercial');
@@ -116,11 +115,11 @@ Deno.serve(async (req) => {
     let final_funil_nome: string | null = null;
     let final_etapa_nome: string | null = null;
 
-    // Correlação via mappings (labels)
-    if (!final_funil_nome && labels.length > 0) {
+    // PRIORIDADE 1: Mappings de labels (labels definem funil)
+    if (labels.length > 0) {
       for (const label of labels) {
         const mapping = mappings.find(
-          m => m.chatwoot_type === 'label' && m.chatwoot_value === label
+          m => m.chatwoot_type === 'label' && m.chatwoot_key === label
         );
         if (mapping) {
           if (mapping.lovable_funil) final_funil_nome = mapping.lovable_funil;
@@ -130,23 +129,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Correlação via mappings (attrs)
-    if (!final_funil_nome && nomeFunil) {
-      const mapping = mappings.find(
-        m => m.chatwoot_type === 'attr' &&
-             m.chatwoot_key === 'nome_do_funil' &&
-             m.chatwoot_value === nomeFunil
-      );
-      if (mapping && mapping.lovable_funil) {
-        final_funil_nome = mapping.lovable_funil;
-      }
-    }
-
-    // Fallback: valores diretos
-    if (!final_funil_nome && nomeFunil) final_funil_nome = nomeFunil;
-    if (!final_etapa_nome && funilEtapa) final_etapa_nome = funilEtapa;
-
-    // Fallback: path base
+    // PRIORIDADE 2: Fallback por path da inbox (se label não definiu)
     if (!final_funil_nome) {
       if (webhookPath.includes('Comercial')) {
         final_funil_nome = 'Comercial';
@@ -155,7 +138,34 @@ Deno.serve(async (req) => {
       }
     }
 
+    // PRIORIDADE 3: Default
     if (!final_funil_nome) final_funil_nome = 'Padrão';
+
+    // RESOLUÇÃO DE ETAPA: depende do funil
+    // Se funil = Comercial → usar etapa_comercial
+    // Senão → usar funil_etapa
+    if (!final_etapa_nome) {
+      if (final_funil_nome === 'Comercial' && etapaComercial) {
+        final_etapa_nome = etapaComercial;
+      } else if (funilEtapa) {
+        final_etapa_nome = funilEtapa;
+      }
+    }
+
+    // Verificar mappings de etapa (se não resolvido ainda)
+    if (!final_etapa_nome && labels.length > 0) {
+      for (const label of labels) {
+        const mapping = mappings.find(
+          m => m.chatwoot_type === 'label' && 
+               m.chatwoot_key === label &&
+               m.lovable_etapa
+        );
+        if (mapping?.lovable_etapa) {
+          final_etapa_nome = mapping.lovable_etapa;
+          break;
+        }
+      }
+    }
 
     console.log(`[dispatcher-multi] Funil: ${final_funil_nome}, Etapa: ${final_etapa_nome || 'auto'}`);
 
@@ -241,7 +251,10 @@ Deno.serve(async (req) => {
         titulo: `Conversa Chatwoot #${conversationId}`,
       };
 
-      if (etapaComercial) updateFields.resumo_comercial = etapaComercial;
+      // Gravar etapa_comercial em resumo_comercial para referência
+      if (etapaComercial && final_funil_nome === 'Comercial') {
+        updateFields.resumo_comercial = `Etapa Comercial: ${etapaComercial}`;
+      }
 
       const { data: upsertedCard, error: upsertError } = await supabase
         .from('cards_conversas')
@@ -272,6 +285,16 @@ Deno.serve(async (req) => {
 
       cardId = upsertedCard.id;
 
+      // Criar atividade se data_retorno foi definida/alterada
+      if (dataRetorno && changed_attrs['data_retorno']) {
+        await supabase.from('atividades_cards').insert({
+          card_id: cardId,
+          tipo: 'DATA_RETORNO',
+          descricao: `Data de retorno definida: ${dataRetorno}`,
+          privado: false,
+        });
+      }
+
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
         conversation_id: conversationId,
@@ -279,7 +302,7 @@ Deno.serve(async (req) => {
         status: 'success',
         event_type: eventType,
         latency_ms: Date.now() - startTime,
-        payload: { funil: final_funil_nome, etapa: final_etapa_nome },
+        payload: { funil: final_funil_nome, etapa: final_etapa_nome, dataRetorno },
       });
 
       return new Response(
