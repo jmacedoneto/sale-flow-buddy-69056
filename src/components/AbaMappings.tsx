@@ -269,11 +269,10 @@ export const AbaMappings = () => {
                 onValueChange={(val) => setFormData({ ...formData, lovable_funil: val })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione um funil" />
+                  <SelectValue placeholder="Selecione um funil (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhum</SelectItem>
-                  {funis.map((f) => (
+                  {funis.filter(f => f && f.trim() !== '').map((f) => (
                     <SelectItem key={f} value={f}>{f}</SelectItem>
                   ))}
                 </SelectContent>
@@ -287,11 +286,10 @@ export const AbaMappings = () => {
                 onValueChange={(val) => setFormData({ ...formData, lovable_etapa: val })}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma etapa" />
+                  <SelectValue placeholder="Selecione uma etapa (opcional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
-                  {etapas.map((e) => (
+                  {etapas.filter(e => e && e.trim() !== '').map((e) => (
                     <SelectItem key={e} value={e}>{e}</SelectItem>
                   ))}
                 </SelectContent>
