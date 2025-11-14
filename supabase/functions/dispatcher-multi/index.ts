@@ -21,25 +21,26 @@ interface WebhookPayload {
 }
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('OK', { headers: corsHeaders });
   }
 
+  const startTime = Date.now();
+  let conversationId: number | null = null;
+  let eventType: string | null = null;
+  let cardId: string | null = null;
+
   try {
-    // Extract webhook path from URL
     const url = new URL(req.url);
     const pathSegments = url.pathname.split('/').filter(s => s);
     const webhookPath = decodeURIComponent(pathSegments[pathSegments.length - 1]);
     
     console.log(`[dispatcher-multi] Webhook path: ${webhookPath}`);
 
-    // Initialize Supabase client with service role
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Check if webhook is active
     const { data: webhookConfig, error: configError } = await supabase
       .from('webhooks_config')
       .select('*')
@@ -48,33 +49,43 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (configError || !webhookConfig) {
-      console.error(`[dispatcher-multi] Webhook inativo ou não encontrado: ${webhookPath}`);
+      console.error(`[dispatcher-multi] Webhook inativo: ${webhookPath}`);
+      
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        status: 'error',
+        event_type: 'webhook_not_found',
+        error_message: `Webhook inativo: ${webhookPath}`,
+        latency_ms: Date.now() - startTime,
+      });
+
       return new Response(
-        JSON.stringify({ error: 'Webhook inativo ou não configurado' }),
+        JSON.stringify({ error: 'Webhook inativo' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    console.log(`[dispatcher-multi] Webhook ativo: ${webhookConfig.name}`);
-
-    // Parse payload
     const payload: WebhookPayload = await req.json();
-    console.log(`[dispatcher-multi] Event: ${payload.event}`);
-
-    const event = payload.event;
+    eventType = payload.event;
     const conv = payload.conversation;
 
     if (!conv?.id) {
-      console.log('[dispatcher-multi] No conversation ID, skipping');
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        status: 'warning',
+        event_type: eventType,
+        error_message: 'Conversation ID ausente',
+        latency_ms: Date.now() - startTime,
+      });
+
       return new Response(
         JSON.stringify({ success: true, message: 'No conversation ID' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const conv_id = conv.id;
+    conversationId = conv.id;
 
-    // Load active mappings for intelligent correlation
     const { data: mappingsData } = await supabase
       .from('mappings_config')
       .select('*')
@@ -82,359 +93,271 @@ Deno.serve(async (req) => {
       .order('ordem', { ascending: true });
 
     const mappings = mappingsData || [];
-    console.log(`[dispatcher-multi] Loaded ${mappings.length} active mappings`);
 
-    // Robust parsing: handle changed_attributes OR custom_attributes, arrays OR strings
     const changed_attrs = conv.changed_attributes?.custom_attrs || {};
     const custom_attrs = conv.custom_attributes || {};
     const labels = conv.labels || [];
 
     const parseAttrValue = (key: string) => {
-      // Try changed_attributes first (format: {current_value: ...})
       let val = changed_attrs[key]?.current_value;
-      
-      // Fallback to custom_attributes
       if (val === undefined || val === null || val === '') {
         val = custom_attrs[key];
       }
-
-      // Handle null/empty
-      if (val === null || val === undefined || val === '') {
-        return null;
-      }
-
-      // Handle arrays (take first element)
-      if (Array.isArray(val)) {
-        return val.length > 0 ? val[0] : null;
-      }
-
+      if (val === null || val === undefined || val === '') return null;
+      if (Array.isArray(val)) return val.length > 0 ? val[0] : null;
       return val;
     };
 
-    const nome_do_funil = parseAttrValue('nome_do_funil');
-    const funil_etapa = parseAttrValue('funil_etapa');
-    const data_retorno = parseAttrValue('data_retorno');
-    const etapa_comercial = parseAttrValue('etapa_comercial');
+    const nomeFunil = parseAttrValue('nome_do_funil');
+    const funilEtapa = parseAttrValue('funil_etapa');
+    const dataRetorno = parseAttrValue('data_retorno');
+    const etapaComercial = parseAttrValue('etapa_comercial');
 
-    console.log(`[dispatcher-multi] Parsed attrs:`, {
-      nome_do_funil,
-      funil_etapa,
-      data_retorno,
-      etapa_comercial,
-      labels
-    });
-
-    // Intelligent correlation: priority order = labels > attrs > path
     let final_funil_nome: string | null = null;
     let final_etapa_nome: string | null = null;
 
-    // 1. Process labels first (highest priority)
-    for (const label of labels) {
-      // Split by ":" (e.g., "etapa:negociacao" -> key="negociacao")
-      const parts = label.split(':');
-      const key = parts.length > 1 ? parts[1] : label.replace(/^label_/, '');
-
-      // Find exact match in mappings
-      const map = mappings.find((m: any) => 
-        m.chatwoot_type === 'label' && 
-        m.chatwoot_key === key && 
-        (!m.chatwoot_value || m.chatwoot_value === label)
-      );
-
-      if (map) {
-        if (map.lovable_funil) final_funil_nome = map.lovable_funil;
-        if (map.lovable_etapa) final_etapa_nome = map.lovable_etapa;
-        console.log(`[dispatcher-multi] Manual match label "${label}" → funil: ${map.lovable_funil}, etapa: ${map.lovable_etapa}`);
-        break; // First match wins (highest ordem)
-      }
-    }
-
-    // 2. Process attributes (overrides labels if higher priority)
-    if (nome_do_funil) {
-      const map = mappings.find((m: any) => 
-        m.chatwoot_type === 'attr' && 
-        m.chatwoot_key === 'nome_do_funil' && 
-        (!m.chatwoot_value || m.chatwoot_value === nome_do_funil)
-      );
-
-      if (map && map.lovable_funil) {
-        final_funil_nome = map.lovable_funil;
-        console.log(`[dispatcher-multi] Manual match attr nome_do_funil="${nome_do_funil}" → funil: ${map.lovable_funil}`);
-      } else {
-        // Fallback: use attribute value directly
-        final_funil_nome = nome_do_funil;
-        console.log(`[dispatcher-multi] No map for attr nome_do_funil="${nome_do_funil}", using value directly`);
-      }
-    }
-
-    if (funil_etapa) {
-      const map = mappings.find((m: any) => 
-        m.chatwoot_type === 'attr' && 
-        m.chatwoot_key === 'funil_etapa' && 
-        (!m.chatwoot_value || m.chatwoot_value === funil_etapa)
-      );
-
-      if (map && map.lovable_etapa) {
-        final_etapa_nome = map.lovable_etapa;
-        console.log(`[dispatcher-multi] Manual match attr funil_etapa="${funil_etapa}" → etapa: ${map.lovable_etapa}`);
-      } else {
-        // Fallback: use attribute value directly
-        final_etapa_nome = funil_etapa;
-        console.log(`[dispatcher-multi] No map for attr funil_etapa="${funil_etapa}", using value directly`);
-      }
-    }
-
-    // 3. Fallback to path-based default if no mappings matched
-    if (!final_funil_nome) {
-      final_funil_nome = webhookPath.includes('Comercial') ? 'Comercial' : 'Administrativo';
-      console.log(`[dispatcher-multi] No mapping matched, using path-based default: ${final_funil_nome}`);
-    }
-
-    // Process conversation_updated event
-    if (event === 'conversation_updated') {
-      console.log(`[dispatcher-multi] Processing conversation ${conv_id}`);
-
-      // Use final correlated funil name
-      const funil_nome = final_funil_nome!;
-      console.log(`[dispatcher-multi] Target funil: ${funil_nome}`);
-
-      // Find or create funil
-      let { data: funil, error: funilError } = await supabase
-        .from('funis')
-        .select('id, nome')
-        .eq('nome', funil_nome)
-        .maybeSingle();
-
-      let funil_created = false;
-      if (!funil) {
-        // Auto-create only if name is > 3 chars (avoid confusion)
-        if (funil_nome.length > 3) {
-          console.log(`[dispatcher-multi] Auto-creating funil: ${funil_nome}`);
-          const { data: newFunil, error: insertError } = await supabase
-            .from('funis')
-            .insert({ nome: funil_nome })
-            .select('id, nome')
-            .single();
-
-          if (insertError) {
-            console.error('[dispatcher-multi] Error creating funil:', insertError);
-            
-            // Try ILIKE fallback
-            const normalized = funil_nome.toLowerCase().replace(/_/g, ' ');
-            const { data: similarFunil } = await supabase
-              .from('funis')
-              .select('id, nome')
-              .ilike('nome', `%${normalized}%`)
-              .limit(1)
-              .maybeSingle();
-
-            if (similarFunil) {
-              funil = similarFunil;
-              console.log(`[dispatcher-multi] Semi-correlate fallback: "${funil_nome}" → "${funil.nome}" (suggest adding map)`);
-            } else {
-              // Use default
-              const { data: defaultFunil } = await supabase
-                .from('funis')
-                .select('id, nome')
-                .eq('nome', 'Padrão')
-                .maybeSingle();
-
-              funil = defaultFunil || { id: null, nome: 'Padrão' };
-              console.log(`[dispatcher-multi] Confuso "${funil_nome}" (create failed) → default "Padrão" (suggest map)`);
-            }
-          } else {
-            funil = newFunil;
-            funil_created = true;
-          }
-        } else {
-          // Too short, use default
-          const { data: defaultFunil } = await supabase
-            .from('funis')
-            .select('id, nome')
-            .eq('nome', 'Padrão')
-            .maybeSingle();
-
-          funil = defaultFunil || { id: null, nome: 'Padrão' };
-          console.log(`[dispatcher-multi] Confuso "${funil_nome}" (too short) → default "Padrão" (suggest map)`);
-        }
-      }
-
-      if (!funil) {
-        console.error('[dispatcher-multi] Failed to resolve funil, skipping');
-        return new Response(
-          JSON.stringify({ error: 'Failed to resolve funil' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    // Correlação via mappings (labels)
+    if (!final_funil_nome && labels.length > 0) {
+      for (const label of labels) {
+        const mapping = mappings.find(
+          m => m.chatwoot_type === 'label' && m.chatwoot_value === label
         );
+        if (mapping) {
+          if (mapping.lovable_funil) final_funil_nome = mapping.lovable_funil;
+          if (mapping.lovable_etapa) final_etapa_nome = mapping.lovable_etapa;
+          break;
+        }
       }
+    }
 
-      console.log(`[dispatcher-multi] Funil resolved: ${funil.nome} (id: ${funil.id}, created: ${funil_created})`);
+    // Correlação via mappings (attrs)
+    if (!final_funil_nome && nomeFunil) {
+      const mapping = mappings.find(
+        m => m.chatwoot_type === 'attr' &&
+             m.chatwoot_key === 'nome_do_funil' &&
+             m.chatwoot_value === nomeFunil
+      );
+      if (mapping && mapping.lovable_funil) {
+        final_funil_nome = mapping.lovable_funil;
+      }
+    }
 
-      // Handle etapa with intelligent correlation
-      let etapa_id = null;
-      let etapa_nome = final_etapa_nome || funil_etapa;
-      let etapa_created = false;
-      let is_default = false;
+    // Fallback: valores diretos
+    if (!final_funil_nome && nomeFunil) final_funil_nome = nomeFunil;
+    if (!final_etapa_nome && funilEtapa) final_etapa_nome = funilEtapa;
 
-      if (etapa_nome) {
-        // Find or create specific etapa
-        let { data: etapa } = await supabase
+    // Fallback: path base
+    if (!final_funil_nome) {
+      if (webhookPath.includes('Comercial')) {
+        final_funil_nome = 'Comercial';
+      } else if (webhookPath.includes('Regional') || webhookPath.includes('Administrativo')) {
+        final_funil_nome = 'Administrativo';
+      }
+    }
+
+    if (!final_funil_nome) final_funil_nome = 'Padrão';
+
+    console.log(`[dispatcher-multi] Funil: ${final_funil_nome}, Etapa: ${final_etapa_nome || 'auto'}`);
+
+    // Auto-create funil
+    let { data: funilRow } = await supabase
+      .from('funis')
+      .select('id, nome')
+      .eq('nome', final_funil_nome)
+      .maybeSingle();
+
+    if (!funilRow) {
+      const { data: newFunil } = await supabase
+        .from('funis')
+        .insert({ nome: final_funil_nome })
+        .select('id, nome')
+        .single();
+      funilRow = newFunil!;
+    }
+
+    const funilId = funilRow.id;
+
+    // Auto-create/find etapa
+    let etapaId: string | null = null;
+
+    const { data: existingEtapas } = await supabase
+      .from('etapas')
+      .select('id, nome, ordem')
+      .eq('funil_id', funilId)
+      .order('ordem', { ascending: true });
+
+    if (final_etapa_nome) {
+      const etapaMatch = existingEtapas?.find(e => e.nome === final_etapa_nome);
+      
+      if (etapaMatch) {
+        etapaId = etapaMatch.id;
+      } else {
+        const maxOrdem = existingEtapas && existingEtapas.length > 0
+          ? Math.max(...existingEtapas.map(e => e.ordem))
+          : 0;
+
+        const { data: newEtapa } = await supabase
           .from('etapas')
-          .select('id, nome')
-          .eq('funil_id', funil.id)
-          .eq('nome', etapa_nome)
-          .maybeSingle();
+          .insert({
+            funil_id: funilId,
+            nome: final_etapa_nome,
+            ordem: maxOrdem + 1
+          })
+          .select('id')
+          .single();
 
-        if (!etapa && etapa_nome.length > 3) {
-          // Auto-create etapa if name is reasonable
-          const { data: maxOrdem } = await supabase
-            .from('etapas')
-            .select('ordem')
-            .eq('funil_id', funil.id)
-            .order('ordem', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          const nextOrdem = (maxOrdem?.ordem || 0) + 1;
-
-          console.log(`[dispatcher-multi] Auto-creating etapa: ${etapa_nome} (ordem: ${nextOrdem})`);
-          const { data: newEtapa, error: etapaError } = await supabase
-            .from('etapas')
-            .insert({ funil_id: funil.id, nome: etapa_nome, ordem: nextOrdem })
-            .select('id, nome')
-            .single();
-
-          if (etapaError) {
-            console.error('[dispatcher-multi] Error creating etapa:', etapaError);
-            // Try ILIKE fallback
-            const normalized = etapa_nome.toLowerCase().replace(/_/g, ' ');
-            const { data: similarEtapa } = await supabase
-              .from('etapas')
-              .select('id, nome')
-              .eq('funil_id', funil.id)
-              .ilike('nome', `%${normalized}%`)
-              .limit(1)
-              .maybeSingle();
-
-            if (similarEtapa) {
-              etapa = similarEtapa;
-              console.log(`[dispatcher-multi] Semi-correlate etapa: "${etapa_nome}" → "${etapa.nome}" (suggest map)`);
-            }
-          } else {
-            etapa = newEtapa;
-            etapa_created = true;
-          }
-        }
-
-        if (etapa) {
-          etapa_id = etapa.id;
-          etapa_nome = etapa.nome;
-        }
+        etapaId = newEtapa!.id;
       }
-
-      // Use default first etapa if none specified
-      if (!etapa_id) {
-        const { data: defaultEtapa } = await supabase
+    } else {
+      if (existingEtapas && existingEtapas.length > 0) {
+        etapaId = existingEtapas[0].id;
+        final_etapa_nome = existingEtapas[0].nome;
+      } else {
+        const { data: newEtapa } = await supabase
           .from('etapas')
+          .insert({
+            funil_id: funilId,
+            nome: 'Nova',
+            ordem: 1
+          })
           .select('id, nome')
-          .eq('funil_id', funil.id)
-          .order('ordem', { ascending: true })
-          .limit(1)
-          .maybeSingle();
+          .single();
 
-        if (defaultEtapa) {
-          etapa_id = defaultEtapa.id;
-          etapa_nome = defaultEtapa.nome;
-          is_default = true;
-        }
+        etapaId = newEtapa!.id;
+        final_etapa_nome = newEtapa!.nome;
       }
+    }
 
-      console.log(`[dispatcher-multi] Etapa resolved: ${etapa_nome || 'none'} (id: ${etapa_id}, created: ${etapa_created}, default: ${is_default})`);
+    // Processar events
+    if (eventType === 'conversation_updated') {
+      const dataRetornoPadrao = dataRetorno || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
 
-      // Build update fields
       const updateFields: any = {
-        chatwoot_conversa_id: conv_id,
-        funil_id: funil.id,
-        funil_nome: funil.nome,
-        titulo: `Conversa Chatwoot #${conv_id}`,
-        updated_at: new Date().toISOString(),
+        funil_id: funilId,
+        etapa_id: etapaId,
+        funil_nome: final_funil_nome,
+        funil_etapa: final_etapa_nome,
+        data_retorno: dataRetornoPadrao,
+        titulo: `Conversa Chatwoot #${conversationId}`,
       };
 
-      if (etapa_id) {
-        updateFields.etapa_id = etapa_id;
-        updateFields.funil_etapa = etapa_nome;
-      }
+      if (etapaComercial) updateFields.resumo_comercial = etapaComercial;
 
-      if (data_retorno) {
-        updateFields.data_retorno = new Date(data_retorno).toISOString();
-      }
-
-      if (funil_nome === 'Comercial' && etapa_comercial) {
-        updateFields.resumo_comercial = etapa_comercial;
-      }
-
-      // Upsert card
-      const { data: upsertData, error: upsertError } = await supabase
+      const { data: upsertedCard, error: upsertError } = await supabase
         .from('cards_conversas')
-        .upsert(updateFields, { onConflict: 'chatwoot_conversa_id' })
-        .select('id');
+        .upsert(
+          {
+            chatwoot_conversa_id: conversationId,
+            ...updateFields
+          },
+          {
+            onConflict: 'chatwoot_conversa_id',
+            ignoreDuplicates: false
+          }
+        )
+        .select('id')
+        .single();
 
       if (upsertError) {
-        console.error('[dispatcher-multi] Upsert error:', upsertError);
-        return new Response(
-          JSON.stringify({ error: 'Database error', details: upsertError.message }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          conversation_id: conversationId,
+          status: 'error',
+          event_type: eventType,
+          error_message: `Upsert error: ${upsertError.message}`,
+          latency_ms: Date.now() - startTime,
+        });
+        throw upsertError;
       }
 
-      const isUpdate = upsertData && upsertData.length > 0;
-      console.log(`[dispatcher-multi] Card ${isUpdate ? 'updated' : 'created'} for conversation ${conv_id}`);
+      cardId = upsertedCard.id;
+
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        conversation_id: conversationId,
+        card_id: cardId,
+        status: 'success',
+        event_type: eventType,
+        latency_ms: Date.now() - startTime,
+        payload: { funil: final_funil_nome, etapa: final_etapa_nome },
+      });
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Card upserted', card_id: cardId }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Process message_created event (private messages)
-    if (event === 'message_created' && payload.private) {
-      console.log(`[dispatcher-multi] Processing private message for conversation ${conv_id}`);
-
-      // Find card by conversation_id
-      const { data: card } = await supabase
+    if (eventType === 'message_created' && payload.private === true) {
+      const { data: cardExists } = await supabase
         .from('cards_conversas')
         .select('id')
-        .eq('chatwoot_conversa_id', conv_id)
+        .eq('chatwoot_conversa_id', conversationId)
         .maybeSingle();
 
-      if (card) {
-        const { error: msgError } = await supabase
+      if (cardExists && payload.id) {
+        const { error: atividadeError } = await supabase
           .from('atividades_cards')
           .insert({
-            card_id: card.id,
+            card_id: cardExists.id,
             tipo: 'MENSAGEM_PRIVADA',
-            descricao: payload.content || 'Mensagem privada recebida',
-            privado: true,
-            chatwoot_message_id: payload.id || null,
-            data_criacao: payload.created_at ? new Date(payload.created_at * 1000).toISOString() : new Date().toISOString(),
+            descricao: payload.content || 'Mensagem privada do Chatwoot',
+            chatwoot_message_id: payload.id,
+            privado: true
           });
 
-        if (msgError) {
-          // Ignore duplicate errors (UNIQUE constraint)
-          if (!msgError.message.includes('duplicate') && !msgError.message.includes('unique')) {
-            console.error('[dispatcher-multi] Private message insert error:', msgError);
-          } else {
-            console.log('[dispatcher-multi] Private message already exists (duplicate), skipping');
-          }
-        } else {
-          console.log(`[dispatcher-multi] Private message appended to card ${card.id}`);
+        if (!atividadeError || atividadeError.message.includes('duplicate')) {
+          await supabase.from('webhook_sync_logs').insert({
+            sync_type: 'chatwoot_to_lovable',
+            conversation_id: conversationId,
+            card_id: cardExists.id,
+            status: 'success',
+            event_type: 'message_created_private',
+            latency_ms: Date.now() - startTime,
+          });
         }
-      } else {
-        console.log(`[dispatcher-multi] No card found for conversation ${conv_id}, skipping private message`);
       }
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Private message processed' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
+    await supabase.from('webhook_sync_logs').insert({
+      sync_type: 'chatwoot_to_lovable',
+      conversation_id: conversationId,
+      status: 'warning',
+      event_type: eventType,
+      error_message: 'Event type not handled',
+      latency_ms: Date.now() - startTime,
+    });
+
     return new Response(
-      JSON.stringify({ success: true, message: 'Synced', webhook: webhookPath }),
+      JSON.stringify({ success: true, message: 'Event ignored' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
   } catch (error) {
     console.error('[dispatcher-multi] Fatal error:', error);
+    
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL')!,
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+      );
+      
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        conversation_id: conversationId,
+        card_id: cardId,
+        status: 'error',
+        event_type: eventType || 'unknown',
+        error_message: String(error).substring(0, 500),
+        latency_ms: Date.now() - startTime,
+      });
+    } catch {}
+
     return new Response(
       JSON.stringify({ error: String(error) }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
