@@ -15,13 +15,23 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
   useEffect(() => {
     const checkApproval = async () => {
       if (user) {
+        // Super admin bypass - libera acesso imediato
+        if (user.email === 'jmacedoneto1989@gmail.com') {
+          console.log('Super admin detected, bypassing approval check');
+          setApproved(true);
+          setCheckingApproval(false);
+          return;
+        }
+
         const { data } = await supabase
           .from('users_crm')
-          .select('approved')
+          .select('approved, role')
           .eq('id', user.id)
-          .single();
+          .maybeSingle();
         
-        setApproved(data?.approved ?? false);
+        // Verifica se é master ou está aprovado
+        const isApproved = data?.approved === true || data?.role === 'master';
+        setApproved(isApproved);
       }
       setCheckingApproval(false);
     };

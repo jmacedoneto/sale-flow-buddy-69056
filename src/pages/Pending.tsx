@@ -28,13 +28,20 @@ const Pending = () => {
               jmacedoneto1989@gmail.com
             </a>
           </p>
-          <div className="pt-4">
+          <div className="pt-4 space-y-2">
             <Button 
               onClick={logout} 
               variant="outline" 
               className="w-full"
             >
               Sair
+            </Button>
+            <Button 
+              onClick={() => window.location.href = '/auth'} 
+              variant="ghost" 
+              className="w-full"
+            >
+              Voltar para Login
             </Button>
           </div>
         </CardContent>
