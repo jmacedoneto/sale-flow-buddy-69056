@@ -129,7 +129,10 @@ export const useMoveCard = () => {
       // Atualizar etapa do card
       const { data: card, error: updateError } = await (supabase as any)
         .from("cards_conversas")
-        .update({ etapa_id: newEtapaId })
+        .update({ 
+          etapa_id: newEtapaId,
+          funil_etapa: newEtapaNome // Atualizar também o nome da etapa
+        })
         .eq("id", cardId)
         .select()
         .single();
@@ -150,6 +153,23 @@ export const useMoveCard = () => {
         });
       
       if (atividadeError) console.error("Erro ao criar atividade:", atividadeError);
+
+      // Sync bidirecional com Chatwoot (silent fail)
+      if (card.chatwoot_conversa_id && newEtapaNome) {
+        try {
+          await supabase.functions.invoke('sync-chatwoot', {
+            body: {
+              conversation_id: card.chatwoot_conversa_id,
+              funil_etapa: newEtapaNome,
+              data_retorno: card.data_retorno,
+            }
+          });
+          console.log(`[Sync Bidir] Chatwoot atualizado: conv ${card.chatwoot_conversa_id} → etapa "${newEtapaNome}"`);
+        } catch (syncError) {
+          // Silent fail - não bloquear movimentação do card
+          console.warn('[Sync Bidir] Falha ao sincronizar com Chatwoot (não crítico):', syncError);
+        }
+      }
       
       return card;
     },
@@ -178,6 +198,31 @@ export const useUpdateCard = () => {
         .single();
       
       if (error) throw error;
+
+      // Sync bidirecional com Chatwoot se data_retorno ou funil_etapa forem alterados
+      if (data.chatwoot_conversa_id && (updates.data_retorno || updates.funil_etapa)) {
+        try {
+          const syncPayload: any = {
+            conversation_id: data.chatwoot_conversa_id,
+          };
+
+          if (updates.data_retorno) {
+            syncPayload.data_retorno = updates.data_retorno;
+          }
+
+          if (updates.funil_etapa) {
+            syncPayload.funil_etapa = updates.funil_etapa;
+          }
+
+          await supabase.functions.invoke('sync-chatwoot', {
+            body: syncPayload
+          });
+          console.log(`[Sync Bidir] Chatwoot atualizado via useUpdateCard: conv ${data.chatwoot_conversa_id}`);
+        } catch (syncError) {
+          console.warn('[Sync Bidir] Falha ao sincronizar com Chatwoot (não crítico):', syncError);
+        }
+      }
+
       return data as CardConversa;
     },
     onSuccess: () => {
