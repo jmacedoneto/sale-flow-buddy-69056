@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Copy, Trash2, Edit, Plus, ExternalLink } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Copy, Trash2, Edit, Plus, ExternalLink, AlertCircle } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -82,6 +84,14 @@ export const AbaWebhooksExternos = () => {
     setIsDialogOpen(true);
   };
 
+  const handleDelete = (id: string) => {
+    if (confirm('Tem certeza que deseja excluir este webhook?')) {
+      deleteConfig(id);
+    }
+  };
+
+  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'sjrmpojssvfgquroywys';
+
   const handleCopyUrl = (inboxPath: string) => {
     const url = generateWebhookUrl(inboxPath);
     navigator.clipboard.writeText(url);
@@ -109,101 +119,104 @@ export const AbaWebhooksExternos = () => {
             Configure as URLs dos webhooks do Chatwoot que serão sincronizados com o CRM.
             Cada inbox pode ter sua própria URL e eventos.
           </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="mb-4">
-            <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Adicionar Webhook
-            </Button>
-          </div>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <Button onClick={() => setIsDialogOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Adicionar Webhook
+          </Button>
+        </div>
 
-          {isLoading ? (
-            <p className="text-muted-foreground">Carregando...</p>
-          ) : configs.length === 0 ? (
-            <p className="text-muted-foreground">Nenhum webhook configurado.</p>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Caminho</TableHead>
-                  <TableHead>Eventos</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {configs.map((config) => (
-                  <TableRow key={config.id}>
-                    <TableCell className="font-medium">{config.name}</TableCell>
-                    <TableCell className="font-mono text-sm">{config.inbox_path}</TableCell>
-                    <TableCell>{config.events.join(', ')}</TableCell>
-                    <TableCell>
-                      <span className={config.active ? "text-green-600" : "text-gray-400"}>
-                        {config.active ? 'Ativo' : 'Inativo'}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-2">
+        {isLoading ? (
+          <p className="text-muted-foreground">Carregando...</p>
+        ) : configs.length === 0 ? (
+          <p className="text-muted-foreground">Nenhum webhook configurado.</p>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Nome</TableHead>
+                <TableHead>URL / Caminho</TableHead>
+                <TableHead>Eventos</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {configs.map((config) => (
+                <TableRow key={config.id}>
+                  <TableCell className="font-medium">{config.name}</TableCell>
+                  <TableCell>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium">Path:</span>
+                        <code className="text-xs bg-muted px-2 py-1 rounded">
+                          {config.inbox_path}
+                        </code>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium">URL Direta:</span>
+                        <code className="text-xs bg-primary/10 px-2 py-1 rounded max-w-md truncate" title={`https://${projectId}.supabase.co/functions/v1/dispatcher-multi/${config.inbox_path}`}>
+                          https://{projectId}.supabase.co/functions/v1/dispatcher-multi/{config.inbox_path}
+                        </code>
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
+                          className="h-6 w-6"
                           onClick={() => handleCopyUrl(config.inbox_path)}
-                          title="Copiar URL do Webhook"
+                          title="Copiar URL Direta"
                         >
-                          <Copy className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(generateWebhookUrl(config.inbox_path), '_blank')}
-                          title="Abrir URL"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEdit(config)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm(`Deletar webhook "${config.name}"?`)) {
-                              deleteConfig(config.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
+                          <Copy className="h-3 w-3" />
                         </Button>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Como Configurar no Chatwoot</CardTitle>
-        </CardHeader>
-        <CardContent className="prose prose-sm max-w-none">
-          <ol className="space-y-2">
-            <li>Acesse <strong>Settings &gt; Integrations &gt; Webhooks</strong> no Chatwoot</li>
-            <li>Clique em <strong>Add Webhook</strong></li>
-            <li>Cole a URL copiada do webhook desejado (botão <Copy className="inline h-3 w-3" />)</li>
-            <li>Selecione os eventos correspondentes (conversation_updated, message_created)</li>
-            <li>Ative o webhook e salve</li>
-          </ol>
-        </CardContent>
-      </Card>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    {config.events?.join(', ') || 'Nenhum'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={config.active ? "default" : "secondary"}>
+                      {config.active ? 'Ativo' : 'Inativo'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2">
+                      {config.url && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                          title="Abrir URL externa"
+                        >
+                          <a href={config.url} target="_blank" rel="noopener noreferrer">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleEdit(config)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDelete(config.id)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={(open) => {
         setIsDialogOpen(open);
@@ -233,16 +246,34 @@ export const AbaWebhooksExternos = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="inbox_path">Caminho do Inbox *</Label>
+                <Label htmlFor="inbox_path">Inbox Path *</Label>
                 <Input
                   id="inbox_path"
-                  placeholder="Ex: /Meu%20Comercial ou /Meu Comercial"
                   value={formData.inbox_path}
-                  onChange={(e) => setFormData({ ...formData, inbox_path: e.target.value })}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    // Remove leading slash
+                    if (value.startsWith('/')) {
+                      value = value.substring(1);
+                    }
+                    // Remove http/https
+                    if (value.startsWith('http://') || value.startsWith('https://')) {
+                      toast({
+                        title: "❌ Formato inválido",
+                        description: "Use apenas o path, não a URL completa",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    // Replace spaces with underscore
+                    value = value.replace(/\s+/g, '_');
+                    setFormData({ ...formData, inbox_path: value });
+                  }}
+                  placeholder="ex: comercial_geral"
                   required
                 />
                 <p className="text-sm text-muted-foreground">
-                  Deve começar com / e ser único. URL gerada: {generateWebhookUrl(formData.inbox_path || '/exemplo')}
+                  Identificador único (sem barra, sem URL). Preview: <code className="text-xs bg-muted px-1 rounded">https://{projectId}.supabase.co/functions/v1/dispatcher-multi/{formData.inbox_path || 'seu_path'}</code>
                 </p>
               </div>
 
