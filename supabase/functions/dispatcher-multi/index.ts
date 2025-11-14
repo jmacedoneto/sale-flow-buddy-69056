@@ -44,24 +44,28 @@ Deno.serve(async (req) => {
     const { data: webhookConfig, error: configError } = await supabase
       .from('webhooks_config')
       .select('*')
-      .eq('inbox_path', `/${webhookPath}`)
+      .eq('inbox_path', webhookPath)
       .eq('active', true)
       .maybeSingle();
 
     if (configError || !webhookConfig) {
-      console.error(`[dispatcher-multi] Webhook inativo: ${webhookPath}`);
+      console.error(`[dispatcher-multi] Webhook não encontrado para path: ${webhookPath}`);
       
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
         status: 'error',
         event_type: 'webhook_not_found',
-        error_message: `Webhook inativo: ${webhookPath}`,
+        error_message: `Webhook não mapeado para path '${webhookPath}'. Verifique webhooks_config.inbox_path.`,
         latency_ms: Date.now() - startTime,
+        payload: { webhookPath, url: req.url },
       });
 
       return new Response(
-        JSON.stringify({ error: 'Webhook inativo' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ 
+          error: 'Webhook não mapeado', 
+          details: `Path '${webhookPath}' não encontrado em webhooks_config` 
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
