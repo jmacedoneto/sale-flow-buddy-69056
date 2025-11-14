@@ -157,3 +157,19 @@ export const cleanOldLogs = async (): Promise<number> => {
 
   return data?.length || 0;
 };
+
+/**
+ * Busca um log específico por ID
+ */
+export const getWebhookLogById = async (id: string): Promise<WebhookLog> => {
+  const { data, error } = await supabase
+    .from('webhook_sync_logs')
+    .select('*')
+    .eq('id', id)
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error('Log não encontrado');
+
+  return data as WebhookLog;
+};

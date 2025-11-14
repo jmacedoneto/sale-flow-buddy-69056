@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useWebhookLogs, useWebhookStats, useCleanOldLogs } from "@/hooks/useWebhookLogs";
+import { LogDetalheDrawer } from "@/components/LogDetalheDrawer";
 import { 
   Activity, 
   TrendingUp, 
@@ -15,7 +16,8 @@ import {
   Trash2,
   RefreshCw,
   ArrowRight,
-  ArrowLeft
+  ArrowLeft,
+  Eye
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -25,6 +27,7 @@ export const AbaMonitoramento = () => {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [syncTypeFilter, setSyncTypeFilter] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<string>("all");
+  const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
   const filters = {
     ...(statusFilter !== "all" && { status: statusFilter as any }),
@@ -214,18 +217,23 @@ export const AbaMonitoramento = () => {
                   <TableHead className="w-[100px]">Conv ID</TableHead>
                   <TableHead className="w-[100px]">Latência</TableHead>
                   <TableHead>Erro</TableHead>
+                  <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {logsLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Carregando logs...
                     </TableCell>
                   </TableRow>
                 ) : logsData && logsData.logs.length > 0 ? (
                   logsData.logs.map((log) => (
-                    <TableRow key={log.id}>
+                    <TableRow 
+                      key={log.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => setSelectedLogId(log.id)}
+                    >
                       <TableCell className="text-xs">
                         {format(new Date(log.created_at), "dd/MM HH:mm:ss", { locale: ptBR })}
                       </TableCell>
@@ -242,11 +250,16 @@ export const AbaMonitoramento = () => {
                       <TableCell className="text-xs text-destructive truncate max-w-[200px]">
                         {log.error_message || '-'}
                       </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                       Nenhum log encontrado
                     </TableCell>
                   </TableRow>
@@ -283,6 +296,13 @@ export const AbaMonitoramento = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Drawer de Detalhes */}
+      <LogDetalheDrawer 
+        logId={selectedLogId}
+        open={!!selectedLogId}
+        onClose={() => setSelectedLogId(null)}
+      />
     </div>
   );
 };
