@@ -385,6 +385,53 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_sync_logs: {
+        Row: {
+          card_id: string | null
+          conversation_id: number | null
+          created_at: string
+          error_message: string | null
+          event_type: string | null
+          id: string
+          latency_ms: number | null
+          payload: Json | null
+          status: string
+          sync_type: string
+        }
+        Insert: {
+          card_id?: string | null
+          conversation_id?: number | null
+          created_at?: string
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          latency_ms?: number | null
+          payload?: Json | null
+          status: string
+          sync_type: string
+        }
+        Update: {
+          card_id?: string | null
+          conversation_id?: number | null
+          created_at?: string
+          error_message?: string | null
+          event_type?: string | null
+          id?: string
+          latency_ms?: number | null
+          payload?: Json | null
+          status?: string
+          sync_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "webhook_sync_logs_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       webhooks_config: {
         Row: {
           active: boolean | null
