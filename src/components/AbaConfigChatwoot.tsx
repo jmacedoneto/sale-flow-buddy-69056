@@ -63,22 +63,19 @@ export const AbaConfigChatwoot = () => {
     }
 
     try {
-      const cleanUrl = testUrl.endsWith('/') ? testUrl.slice(0, -1) : testUrl;
-      const res = await fetch(
-        `${cleanUrl}/api/v1/accounts/${testAccountId}/conversations?api_access_token=${testApiKey}`
-      );
-
-      if (res.ok) {
-        const data = await res.json();
+      const { testChatwootConnection } = await import("@/services/chatwootConfigService");
+      const result = await testChatwootConnection(testUrl, parseInt(testAccountId), testApiKey);
+      
+      if (result.ok) {
         setStatus('connected');
-        console.log('Status set: connected', data?.length || 0, 'conversas');
+        console.log('[AbaConfigChatwoot] Auto-test OK:', result.message);
       } else {
-        setStatus('invalid');
-        console.log('Status set: invalid', res.status, res.statusText);
+        setStatus(result.status === 'auth_error' ? 'invalid' : 'network_error');
+        console.log('[AbaConfigChatwoot] Auto-test falhou:', result.status, result.message);
       }
     } catch (err: any) {
       setStatus('network_error');
-      console.log('Status set: network_error', err.message);
+      console.error('[AbaConfigChatwoot] Erro no auto-test:', err);
     }
   };
 
@@ -95,26 +92,38 @@ export const AbaConfigChatwoot = () => {
         return;
       }
 
-      const cleanUrl = formData.url.endsWith('/') ? formData.url.slice(0, -1) : formData.url;
-      const res = await fetch(
-        `${cleanUrl}/api/v1/accounts/${formData.account_id}/conversations?api_access_token=${formData.api_key}`
+      const { testChatwootConnection } = await import("@/services/chatwootConfigService");
+      const result = await testChatwootConnection(
+        formData.url,
+        parseInt(formData.account_id),
+        formData.api_key
       );
 
-      if (res.ok) {
-        const data = await res.json();
+      if (result.ok) {
         setStatus('connected');
-        toast.success(data?.length > 0 ? "✓ Conectado com dados!" : "✓ Conectado mas sem conversas", {
-          description: `Encontradas ${data?.length || 0} conversas.`,
+        toast.success("✓ Conexão com Chatwoot OK", {
+          description: result.message,
         });
       } else {
-        setStatus('invalid');
-        toast.error(`❌ Falha conexão: ${res.status} - ${res.statusText}`, {
-          description: "Verifique key/URL",
+        // Mapear status da edge para status da UI
+        if (result.status === 'auth_error') {
+          setStatus('invalid');
+        } else if (result.status === 'network_error') {
+          setStatus('network_error');
+        } else {
+          setStatus('invalid');
+        }
+        
+        toast.error("❌ Falha ao conectar", {
+          description: result.message,
         });
       }
     } catch (err: any) {
       setStatus('network_error');
-      toast.error(`❌ Erro rede: ${err.message}`);
+      toast.error("❌ Erro ao testar conexão", {
+        description: err.message || "Erro desconhecido ao chamar edge function",
+      });
+      console.error('[AbaConfigChatwoot] Erro ao testar:', err);
     } finally {
       setIsTesting(false);
     }

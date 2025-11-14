@@ -42,12 +42,13 @@ export const useChatwootConfig = () => {
 
   // Mutation para testar conexão
   const testMutation = useMutation({
-    mutationFn: testChatwootConnection,
+    mutationFn: (params: { url: string; accountId: number; apiKey: string }) => 
+      testChatwootConnection(params.url, params.accountId, params.apiKey),
     onSuccess: (data) => {
-      if (data.success) {
+      if (data.ok) {
         toast({
           title: "✓ Chatwoot conectado com sucesso",
-          description: `Encontradas ${data.conversation_count || 0} conversas.`,
+          description: data.message,
         });
       } else {
         toast({
