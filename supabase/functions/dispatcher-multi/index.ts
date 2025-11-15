@@ -147,20 +147,37 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Tentar extrair payload de múltiplos formatos
-    let payload: WebhookPayload | null = null;
+// Função para extrair conversation_id de múltiplos formatos
+    function resolveConversationId(payload: any): number | null {
+      return (
+        payload.conversation_id ??
+        payload.conversation?.id ??
+        payload.id ??
+        null
+      );
+    }
+
+    // Extrair e desembrulhar payload
+    let body: any = null;
+    let payload: any = null;
+    let payloadFormat = 'unknown';
     const method = req.method;
 
     // Formato 1: POST com JSON body
     if (method === 'POST' && contentType?.includes('application/json')) {
       try {
-        const body = await req.text();
-        console.log(`[dispatcher-multi] Raw body length: ${body.length}`);
-        console.log(`[dispatcher-multi] Raw body preview: ${body.substring(0, 500)}`);
+        const rawBody = await req.text();
+        console.log(`[dispatcher-multi] Raw body length: ${rawBody.length}`);
+        console.log(`[dispatcher-multi] Raw body preview: ${rawBody.substring(0, 500)}`);
         
-        if (body && body.trim().length > 0) {
-          payload = JSON.parse(body);
-          console.log(`[dispatcher-multi] Payload parseado do body JSON`);
+        if (rawBody && rawBody.trim().length > 0) {
+          body = JSON.parse(rawBody);
+          
+          // Unwrap: se vier de proxy (webhook.site), o Chatwoot original está em receivedPayload
+          payload = body.receivedPayload ?? body;
+          payloadFormat = body.receivedPayload ? 'wrapped' : 'raw';
+          
+          console.log(`[dispatcher-multi] Payload parseado (format: ${payloadFormat})`);
         }
       } catch (e) {
         console.error(`[dispatcher-multi] Erro ao parsear JSON:`, e);
@@ -182,24 +199,29 @@ Deno.serve(async (req) => {
             custom_attributes: customAttrs ? JSON.parse(customAttrs) : {},
           }
         };
+        payloadFormat = 'query_params';
         console.log(`[dispatcher-multi] Payload reconstruído dos query params`);
       }
     }
 
-    // Validar payload
-    if (!payload || !payload.conversation?.id) {
-      console.error(`[dispatcher-multi] Payload inválido ou ausente`);
+    // Extrair conversation_id usando função robusta
+    conversationId = payload ? resolveConversationId(payload) : null;
+
+    // Validar conversation_id
+    if (!conversationId) {
+      console.error(`[dispatcher-multi] Payload inválido: conversation_id ausente`);
       console.log(`[dispatcher-multi] Payload recebido:`, JSON.stringify(payload));
       
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
         status: 'error',
         event_type: payload?.event || 'unknown',
-        error_message: 'Payload inválido ou conversation_id ausente',
+        error_message: 'Payload inválido: conversation_id ausente',
         latency_ms: Date.now() - startTime,
         payload: {
           method,
           url: req.url,
+          payload_format: payloadFormat,
           headers: Object.fromEntries(req.headers.entries()),
           receivedPayload: payload,
         },
@@ -208,12 +230,12 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           error: 'Invalid payload', 
-          details: 'No valid conversation data received',
+          details: 'conversation_id ausente',
           debug: {
             method,
+            payloadFormat,
             hasPayload: !!payload,
-            hasConversation: !!payload?.conversation,
-            hasId: !!payload?.conversation?.id,
+            conversationId,
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -221,9 +243,12 @@ Deno.serve(async (req) => {
     }
 
     eventType = payload.event;
-    const conv = payload.conversation;
+    const conv = payload.conversation || payload;
 
-    conversationId = conv.id;
+    // Extrair nome do contato
+    const contactName = payload.contact?.name || 
+                       payload.meta?.sender?.name || 
+                       `Conversa Chatwoot #${conversationId}`;
 
     const { data: mappingsData } = await supabase
       .from('mappings_config')
@@ -359,7 +384,7 @@ Deno.serve(async (req) => {
         funil_nome: final_funil_nome,
         funil_etapa: final_etapa_nome,
         data_retorno: dataRetornoFinal,
-        titulo: `Conversa Chatwoot #${conversationId}`,
+        titulo: contactName,
       };
 
       // Gravar etapa em resumo_comercial se for comercial
@@ -414,11 +439,13 @@ Deno.serve(async (req) => {
         event_type: eventType,
         latency_ms: Date.now() - startTime,
         payload: { 
+          payload_format: payloadFormat,
           label: labels[0] || null,
           funil: final_funil_nome, 
           tipo: tipoFunil,
           etapa: final_etapa_nome, 
-          dataRetorno: dataRetornoFinal 
+          dataRetorno: dataRetornoFinal,
+          contactName 
         },
       });
 
