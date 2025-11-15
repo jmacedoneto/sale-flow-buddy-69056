@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -7,8 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CalendarIcon, Save, Plus, Send, AlertCircle } from "lucide-react";
+import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -17,11 +16,11 @@ import type { CardConversa } from "@/types/database";
 import { useUpdateCard, useFunis, useEtapas } from "@/hooks/useFunis";
 import { useAtividades, useCreateAtividade } from "@/hooks/useAtividades";
 import { AtividadeTimeline } from "./AtividadeTimeline";
-import { useChatwootMessages } from "@/hooks/useChatwootMessages";
-import { ChatwootMessageTimeline } from "./ChatwootMessageTimeline";
-import { useChatwootSync } from "@/hooks/useChatwootSync";
-import { useChatwootConfig } from "@/hooks/useChatwootConfig";
+import { ChatInbox } from "./chat/ChatInbox";
 import { toast } from "sonner";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
 
 interface CardDetailsModalProps {
   card: CardConversa | null;
@@ -29,6 +28,11 @@ interface CardDetailsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+/**
+ * Card Details em formato Sheet fullscreen (Onda 3)
+ * Layout 2 colunas em desktop: Conteúdo principal (70%) + Sidebar (30%)
+ * Mobile: Layout single-column com tabs
+ */
 export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalProps) => {
   const [titulo, setTitulo] = useState("");
   const [prazo, setPrazo] = useState<Date | undefined>(undefined);
@@ -41,19 +45,12 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   const [dataRetorno, setDataRetorno] = useState<Date | undefined>(
     new Date(Date.now() + 7 * 86400000)
   );
-  const [followUpMessage, setFollowUpMessage] = useState("");
-  const [sendingFollowUp, setSendingFollowUp] = useState(false);
   
   const updateCard = useUpdateCard();
   const { data: atividades, isLoading: isLoadingAtividades } = useAtividades(card?.id || null);
   const createAtividade = useCreateAtividade();
-  const { data: chatwootMessages, isLoading: isLoadingMessages } = useChatwootMessages(
-    card?.chatwoot_conversa_id || null
-  );
   const { data: funis } = useFunis();
   const { data: etapas } = useEtapas(funilId || null);
-  const { syncChatwoot } = useChatwootSync();
-  const { config: chatwootConfig } = useChatwootConfig();
 
   useEffect(() => {
     if (card) {
@@ -91,346 +88,296 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     updateCard.mutate(
       { id: card.id, updates },
       {
-        onSuccess: async () => {
-          // Criar atividade de tarefa agendada
-          if (dataRetorno) {
-            createAtividade.mutate({
-              cardId: card.id,
-              tipo: "TAREFA_AGENDADA",
-              descricao: `Prazo: ${format(dataRetorno, "dd/MM/yyyy", { locale: ptBR })}`,
-            });
-          }
-
-          // Sincronizar com Chatwoot se houver conversa vinculada
-          if (card.chatwoot_conversa_id && funilNome && funilEtapa && dataRetorno) {
-            await syncChatwoot({
-              conversation_id: card.chatwoot_conversa_id,
-              nome_do_funil: funilNome,
-              funil_etapa: funilEtapa,
-              data_retorno: dataRetorno.toISOString(),
-            });
-          }
-
-          onOpenChange(false);
+        onSuccess: () => {
+          toast.success("Card atualizado com sucesso!");
+        },
+        onError: (error) => {
+          console.error("Erro ao atualizar card:", error);
+          toast.error("Erro ao atualizar card");
         },
       }
     );
   };
 
-  const handleAddNota = () => {
+  const handleAddNota = async () => {
     if (!card || !novaNota.trim()) return;
 
-    createAtividade.mutate({
-      cardId: card.id,
-      tipo: "NOTA",
-      descricao: novaNota,
-    });
-
-    setNovaNota("");
-  };
-
-  const handleSendFollowUp = async () => {
-    if (!card || !followUpMessage.trim()) return;
-
-    setSendingFollowUp(true);
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/private-message-sync`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            card_id: card.id,
-            message: followUpMessage,
-          }),
-        }
-      );
-
-      const result = await response.json();
-      
-      if (result.ok) {
-        toast.success('Follow-up privado enviado com sucesso');
-        setFollowUpMessage('');
-      } else if (result.error === 'Card sem funil, ignora') {
-        toast.error('Selecione um funil na aba Detalhes antes de enviar o follow-up');
-      } else {
-        toast.error(result.error || 'Erro ao enviar follow-up');
+    createAtividade.mutate(
+      {
+        cardId: card.id,
+        tipo: "nota",
+        descricao: novaNota,
+      },
+      {
+        onSuccess: () => {
+          setNovaNota("");
+          toast.success("Nota adicionada!");
+        },
+        onError: (error) => {
+          console.error("Erro ao adicionar nota:", error);
+          toast.error("Erro ao adicionar nota");
+        },
       }
-    } catch (error) {
-      console.error('Erro ao enviar follow-up:', error);
-      toast.error('Erro ao enviar follow-up privado');
-    } finally {
-      setSendingFollowUp(false);
-    }
+    );
   };
 
   if (!card) return null;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-card">
-        <DialogHeader>
-          <DialogTitle>Detalhes do Card</DialogTitle>
-          <DialogDescription>
-            Edite as informações comerciais e acompanhe o histórico
-          </DialogDescription>
-        </DialogHeader>
-
-        <Tabs defaultValue="detalhes" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="detalhes">Detalhes</TabsTrigger>
-            <TabsTrigger value="atividades">Atividades CRM</TabsTrigger>
-            <TabsTrigger value="chatwoot">Histórico Chatwoot</TabsTrigger>
-            <TabsTrigger value="followup">Follow-up Privado</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="detalhes" className="space-y-6 py-4">
-          {/* Título */}
-          <div className="space-y-2">
-            <Label htmlFor="titulo">Título</Label>
-            <Input
-              id="titulo"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              placeholder="Título da conversa"
-            />
-          </div>
-
-          {/* Funil */}
-          <div className="space-y-2">
-            <Label htmlFor="funil">Funil</Label>
-            <Select value={funilId} onValueChange={(value) => { setFunilId(value); setEtapaId(""); }}>
-              <SelectTrigger className="w-full bg-background">
-                <SelectValue placeholder="Selecione o funil" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover z-50">
-                {funis?.map((funil) => (
-                  <SelectItem key={funil.id} value={funil.id}>
-                    {funil.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Etapa */}
-          <div className="space-y-2">
-            <Label htmlFor="etapa">Etapa</Label>
-            <Select value={etapaId} onValueChange={setEtapaId} disabled={!funilId}>
-              <SelectTrigger className="w-full bg-background">
-                <SelectValue placeholder="Selecione a etapa" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover z-50">
-                {etapas?.map((etapa) => (
-                  <SelectItem key={etapa.id} value={etapa.id}>
-                    {etapa.nome}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Data de Retorno */}
-          <div className="space-y-2">
-            <Label>Data de Retorno *</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !dataRetorno && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dataRetorno ? format(dataRetorno, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
-                <Calendar
-                  mode="single"
-                  selected={dataRetorno}
-                  onSelect={setDataRetorno}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Prazo */}
-          <div className="space-y-2">
-            <Label>Prazo (opcional)</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !prazo && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {prazo ? format(prazo, "PPP", { locale: ptBR }) : <span>Selecione uma data</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-popover z-50" align="start">
-                <Calendar
-                  mode="single"
-                  selected={prazo}
-                  onSelect={setPrazo}
-                  initialFocus
-                  className={cn("p-3 pointer-events-auto")}
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* Prioridade */}
-          <div className="space-y-2">
-            <Label htmlFor="prioridade">Prioridade</Label>
-            <Select value={prioridade} onValueChange={setPrioridade}>
-              <SelectTrigger className="w-full bg-background">
-                <SelectValue placeholder="Selecione a prioridade" />
-              </SelectTrigger>
-              <SelectContent className="bg-popover z-50">
-                <SelectItem value="baixa">Baixa</SelectItem>
-                <SelectItem value="media">Média</SelectItem>
-                <SelectItem value="alta">Alta</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Descrição Detalhada */}
-          <div className="space-y-2">
-            <Label htmlFor="descricao">Descrição Detalhada</Label>
-            <Textarea
-              id="descricao"
-              value={descricaoDetalhada}
-              onChange={(e) => setDescricaoDetalhada(e.target.value)}
-              placeholder="Descreva os detalhes da conversa..."
-              className="min-h-[120px]"
-            />
-          </div>
-
-          {/* Resumo Comercial */}
-          <div className="space-y-2">
-            <Label htmlFor="resumo-comercial">Resumo Comercial</Label>
-            <Textarea
-              id="resumo-comercial"
-              value={resumoComercial}
-              onChange={(e) => setResumoComercial(e.target.value)}
-              placeholder="Resumo comercial da negociação..."
-              className="min-h-[120px]"
-              />
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent 
+        side="right" 
+        className="w-full sm:max-w-[95vw] p-0 flex flex-col overflow-hidden"
+      >
+        {/* Header */}
+        <SheetHeader className="p-6 pb-4 border-b border-border shrink-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <SheetTitle className="text-2xl font-bold">{card.titulo}</SheetTitle>
+              <div className="flex flex-wrap gap-2">
+                {card.chatwoot_conversa_id && (
+                  <Badge variant="outline" className="text-xs">
+                    Conversa #{card.chatwoot_conversa_id}
+                  </Badge>
+                )}
+                {card.funil_nome && (
+                  <Badge variant="secondary" className="text-xs">
+                    {card.funil_nome}
+                  </Badge>
+                )}
+                {card.funil_etapa && (
+                  <Badge className="text-xs">
+                    {card.funil_etapa}
+                  </Badge>
+                )}
+              </div>
             </div>
-          </TabsContent>
+            <Button onClick={handleSave} disabled={updateCard.isPending} className="shrink-0">
+              <Save className="h-4 w-4 mr-2" />
+              Salvar
+            </Button>
+          </div>
+        </SheetHeader>
 
-          <TabsContent value="atividades" className="space-y-4 py-4">
-            {/* Adicionar Nova Nota */}
-            <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/30">
-              <Label htmlFor="nova-nota">Nova Nota</Label>
-              <Textarea
-                id="nova-nota"
-                value={novaNota}
-                onChange={(e) => setNovaNota(e.target.value)}
-                placeholder="Digite sua nota aqui..."
-                className="min-h-[80px]"
-              />
-              <Button 
-                onClick={handleAddNota} 
-                className="gap-2"
-                disabled={!novaNota.trim() || createAtividade.isPending}
-              >
-                <Plus className="h-4 w-4" />
-                Adicionar Nota
-              </Button>
-            </div>
+        {/* Content - Layout 2 colunas em desktop */}
+        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
+          {/* Coluna Principal - 70% */}
+          <div className="flex-1 lg:w-[70%] flex flex-col overflow-hidden border-r border-border">
+            <Tabs defaultValue="chat" className="flex-1 flex flex-col overflow-hidden">
+              <TabsList className="w-full justify-start rounded-none border-b border-border px-6 shrink-0">
+                <TabsTrigger value="chat" className="gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Conversas
+                </TabsTrigger>
+                <TabsTrigger value="atividades" className="gap-2">
+                  <Activity className="h-4 w-4" />
+                  Atividades
+                </TabsTrigger>
+              </TabsList>
 
-            {/* Timeline de Atividades */}
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-foreground">Histórico de Atividades</h4>
-              {isLoadingAtividades ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Carregando...
-                </div>
-              ) : (
-                <AtividadeTimeline atividades={atividades || []} />
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="chatwoot" className="space-y-4 py-4">
-            <div className="space-y-2">
-              <h4 className="font-medium text-sm text-foreground">
-                Histórico de Mensagens do Chatwoot
-              </h4>
-              {isLoadingMessages ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Carregando mensagens...
-                </div>
-              ) : !card?.chatwoot_conversa_id ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  Este card não está vinculado a uma conversa do Chatwoot
-                </div>
-              ) : (
-                <ChatwootMessageTimeline messages={chatwootMessages || []} />
-              )}
-            </div>
-          </TabsContent>
-
-          <TabsContent value="followup" className="space-y-4 py-4">
-            <div className="space-y-4">
-              <h4 className="font-medium text-sm text-foreground">
-                Enviar Follow-up Privado
-              </h4>
-              
-              {!card?.funil_id ? (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    ⚠️ Selecione um funil na aba "Detalhes" antes de enviar um follow-up privado
-                  </AlertDescription>
-                </Alert>
-              ) : (
-                <div className="space-y-3 p-4 border border-border rounded-lg bg-muted/30">
-                  <Label htmlFor="followup-message">Mensagem Privada</Label>
-                  <Textarea
-                    id="followup-message"
-                    value={followUpMessage}
-                    onChange={(e) => setFollowUpMessage(e.target.value)}
-                    placeholder="Digite seu follow-up privado aqui..."
-                    className="min-h-[120px]"
+              <TabsContent value="chat" className="flex-1 m-0 overflow-hidden">
+                {card.chatwoot_conversa_id ? (
+                  <ChatInbox
+                    conversationId={card.chatwoot_conversa_id}
+                    cardId={card.id}
+                    funilId={card.funil_id}
                   />
-                  <Button 
-                    onClick={handleSendFollowUp}
-                    className="gap-2"
-                    disabled={!followUpMessage.trim() || sendingFollowUp}
-                  >
-                    <Send className="h-4 w-4" />
-                    {sendingFollowUp ? 'Enviando...' : 'Enviar Follow-up'}
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    Este follow-up será registrado no CRM e, se conectado, enviado como nota privada no Chatwoot
-                  </p>
-                </div>
-              )}
-            </div>
-          </TabsContent>
-        </Tabs>
+                ) : (
+                  <div className="flex items-center justify-center h-full text-muted-foreground">
+                    <div className="text-center space-y-2">
+                      <MessageSquare className="h-12 w-12 mx-auto opacity-50" />
+                      <p>Nenhuma conversa vinculada a este card</p>
+                    </div>
+                  </div>
+                )}
+              </TabsContent>
 
-        <div className="flex justify-end gap-2 pt-4 border-t border-border">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} className="gap-2">
-            <Save className="h-4 w-4" />
-            Salvar
-          </Button>
+              <TabsContent value="atividades" className="flex-1 m-0 overflow-hidden p-6">
+                <ScrollArea className="h-full">
+                  <div className="space-y-4">
+                    {/* Adicionar nova nota */}
+                    <div className="space-y-2">
+                      <Label>Adicionar Nota</Label>
+                      <div className="flex gap-2">
+                        <Textarea
+                          value={novaNota}
+                          onChange={(e) => setNovaNota(e.target.value)}
+                          placeholder="Digite uma nota..."
+                          className="min-h-[80px]"
+                        />
+                        <Button
+                          onClick={handleAddNota}
+                          disabled={!novaNota.trim() || createAtividade.isPending}
+                          size="sm"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Timeline de atividades */}
+                    {isLoadingAtividades ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        Carregando atividades...
+                      </div>
+                    ) : (
+                      <AtividadeTimeline atividades={atividades || []} />
+                    )}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          </div>
+
+          {/* Sidebar - 30% */}
+          <ScrollArea className="w-full lg:w-[30%] bg-muted/20">
+            <div className="p-6 space-y-6">
+              {/* Informações do Card */}
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <Info className="h-5 w-5" />
+                  Detalhes do Card
+                </h3>
+
+                <div className="space-y-3">
+                  <div>
+                    <Label>Título</Label>
+                    <Input
+                      value={titulo}
+                      onChange={(e) => setTitulo(e.target.value)}
+                      placeholder="Título do card"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Funil</Label>
+                    <Select value={funilId} onValueChange={setFunilId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione um funil" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {funis?.map((funil) => (
+                          <SelectItem key={funil.id} value={funil.id}>
+                            {funil.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Etapa</Label>
+                    <Select value={etapaId} onValueChange={setEtapaId} disabled={!funilId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione uma etapa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {etapas?.map((etapa) => (
+                          <SelectItem key={etapa.id} value={etapa.id}>
+                            {etapa.nome}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Prioridade</Label>
+                    <Select value={prioridade} onValueChange={setPrioridade}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a prioridade" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="alta">Alta</SelectItem>
+                        <SelectItem value="media">Média</SelectItem>
+                        <SelectItem value="baixa">Baixa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label>Prazo</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !prazo && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {prazo ? format(prazo, "PPP", { locale: ptBR }) : "Selecione uma data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={prazo}
+                          onSelect={setPrazo}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div>
+                    <Label>Data de Retorno</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !dataRetorno && "text-muted-foreground"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {dataRetorno
+                            ? format(dataRetorno, "PPP", { locale: ptBR })
+                            : "Selecione uma data"}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={dataRetorno}
+                          onSelect={setDataRetorno}
+                          initialFocus
+                          className="pointer-events-auto"
+                        />
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+
+                  <div>
+                    <Label>Descrição Detalhada</Label>
+                    <Textarea
+                      value={descricaoDetalhada}
+                      onChange={(e) => setDescricaoDetalhada(e.target.value)}
+                      placeholder="Descrição completa do card"
+                      className="min-h-[100px]"
+                    />
+                  </div>
+
+                  <div>
+                    <Label>Resumo Comercial</Label>
+                    <Textarea
+                      value={resumoComercial}
+                      onChange={(e) => setResumoComercial(e.target.value)}
+                      placeholder="Resumo comercial"
+                      className="min-h-[80px]"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
         </div>
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 };
