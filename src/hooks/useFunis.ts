@@ -102,12 +102,25 @@ export const useAllCardsForFunil = (funilId: string | null, page: number = 0, pa
         statusInfo: computarStatusTarefa(card.data_retorno)
       } as CardWithStatus));
 
+      // P1.1: Log de debug (apenas em desenvolvimento)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[useAllCardsForFunil]', {
+          funilId,
+          page,
+          totalCount: count,
+          cardsRetornados: cardsComStatus.length,
+          primeiroCardId: cardsComStatus[0]?.id,
+        });
+      }
+
       return {
         cards: cardsComStatus,
         totalCount: count || 0
       };
     },
     enabled: !!funilId,
+    refetchInterval: 10000, // P1.1: Auto-atualização a cada 10 segundos
+    staleTime: 5000, // P1.1: Considerar dados frescos por 5 segundos
   });
 };
 

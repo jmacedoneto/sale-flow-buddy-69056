@@ -8,11 +8,12 @@ interface EtapaColumnProps {
   etapaId: string;
   nome: string;
   cards: CardWithStatus[];
+  totalCards?: number;
   onCardClick?: (card: CardWithStatus) => void;
   onAgendarClick?: (card: CardWithStatus) => void;
 }
 
-export const EtapaColumn = ({ etapaId, nome, cards, onCardClick, onAgendarClick }: EtapaColumnProps) => {
+export const EtapaColumn = ({ etapaId, nome, cards, totalCards, onCardClick, onAgendarClick }: EtapaColumnProps) => {
   const { setNodeRef, isOver } = useDroppable({
     id: etapaId,
   });
@@ -30,6 +31,9 @@ export const EtapaColumn = ({ etapaId, nome, cards, onCardClick, onAgendarClick 
         <h3 className="font-semibold text-foreground">{nome}</h3>
         <Badge variant="secondary" className="text-xs">
           {cards.length}
+          {totalCards && totalCards > cards.length && (
+            <span className="ml-1 text-muted-foreground">/ {totalCards}</span>
+          )}
         </Badge>
       </div>
       
