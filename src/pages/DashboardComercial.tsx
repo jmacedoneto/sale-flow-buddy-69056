@@ -2,10 +2,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, TrendingUp, Users, Target } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useFunis } from "@/hooks/useFunis";
+import { DashboardTemplate } from "@/components/dashboard/DashboardTemplate";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { FunnelChart } from "@/components/dashboard/FunnelChart";
 
 interface ConversionMetric {
   from: string;
@@ -96,6 +99,19 @@ export default function DashboardComercial() {
     fetchMetrics();
   }, [funilComercial]);
 
+  // KPIs principais
+  const totalCards = metrics.funnel.reduce((sum, item) => sum + item.value, 0);
+  const taxaConversaoGeral = metrics.funnel.length > 0 
+    ? Math.round((metrics.funnel[metrics.funnel.length - 1].value / metrics.funnel[0].value) * 100) 
+    : 0;
+
+  // Preparar dados para FunnelChart
+  const funnelStages = metrics.funnel.map((item, idx) => ({
+    name: ETAPAS_COMERCIAL[idx],
+    count: item.value,
+    color: COLORS[idx],
+  }));
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -119,6 +135,35 @@ export default function DashboardComercial() {
           </div>
         ) : (
           <>
+            {/* KPIs no Topo */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <MetricCard
+                title="Total de Leads"
+                value={totalCards}
+                description="Cards no funil comercial"
+                icon={Users}
+              />
+              <MetricCard
+                title="Taxa de Conversão"
+                value={`${taxaConversaoGeral}%`}
+                description="Do primeiro contato ao fechamento"
+                icon={TrendingUp}
+              />
+              <MetricCard
+                title="Em Negociação"
+                value={metrics.funnel[3]?.value || 0}
+                description="Oportunidades ativas"
+                icon={Target}
+              />
+            </div>
+
+            {/* Funil de Conversão Moderno */}
+            <FunnelChart 
+              stages={funnelStages}
+              title="Funil de Vendas"
+              description="Distribuição de leads por etapa do processo comercial"
+            />
+
             {/* Taxa de Conversão entre Etapas */}
             <Card>
               <CardHeader>

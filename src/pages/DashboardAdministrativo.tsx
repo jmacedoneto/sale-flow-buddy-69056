@@ -2,10 +2,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { supabase } from "@/integrations/supabase/client";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertCircle, CheckCircle, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { useFunis } from "@/hooks/useFunis";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { FunnelChart } from "@/components/dashboard/FunnelChart";
 
 interface EtapaMetric {
   name: string;
@@ -97,6 +99,18 @@ export default function DashboardAdministrativo() {
     fetchMetrics();
   }, [funisAdmin.length]);
 
+  // KPIs principais
+  const totalDemandas = metrics.etapas.reduce((sum, item) => sum + item.value, 0);
+  const resolvidas = metrics.status.find(s => s.name === 'Resolvido')?.value || 0;
+  const pendentes = metrics.status.find(s => s.name === 'Pendente')?.value || 0;
+
+  // Preparar dados para FunnelChart
+  const funnelStages = metrics.etapas.map((item, idx) => ({
+    name: item.name,
+    count: item.value,
+    color: COLORS[idx],
+  }));
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
@@ -120,6 +134,35 @@ export default function DashboardAdministrativo() {
           </div>
         ) : (
           <>
+            {/* KPIs no Topo */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <MetricCard
+                title="Total de Demandas"
+                value={totalDemandas}
+                description="Todas as demandas administrativas"
+                icon={AlertCircle}
+              />
+              <MetricCard
+                title="Resolvidas"
+                value={resolvidas}
+                description="Demandas concluídas/arquivadas"
+                icon={CheckCircle}
+              />
+              <MetricCard
+                title="Pendentes"
+                value={pendentes}
+                description="Aguardando resolução"
+                icon={Clock}
+              />
+            </div>
+
+            {/* Funil Administrativo */}
+            <FunnelChart 
+              stages={funnelStages}
+              title="Distribuição por Etapa"
+              description="Status das demandas administrativas"
+            />
+
             {/* Distribuição por Etapa */}
             <Card>
               <CardHeader>

@@ -1,4 +1,4 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LayoutGrid, List } from "lucide-react";
@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 /**
  * Template unificado para dashboards Comercial e Administrativo.
  * Centraliza header, seletor de funil e toggle Kanban/Lista (DRY, SRP).
+ * Onda 2: Adiciona controle de viewMode com persistência em localStorage.
  */
 
 export type ViewMode = 'kanban' | 'list';
@@ -16,6 +17,7 @@ interface DashboardTemplateProps {
   title: string;
   funilIds?: string[]; // Se não informado, mostra todos os funis permitidos
   defaultViewMode?: ViewMode;
+  storageKey?: string; // Key para persistir viewMode no localStorage
   children: (props: {
     selectedFunilId: string | null;
     viewMode: ViewMode;
@@ -26,11 +28,23 @@ export const DashboardTemplate = ({
   title,
   funilIds,
   defaultViewMode = 'kanban',
+  storageKey = 'dashboard-view-mode',
   children,
 }: DashboardTemplateProps) => {
   const { data: allFunis = [], isLoading: loadingFunis } = useFunis();
-  const [viewMode, setViewMode] = useState<ViewMode>(defaultViewMode);
+  
+  // Persistir viewMode em localStorage
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const stored = localStorage.getItem(storageKey);
+    return (stored as ViewMode) || defaultViewMode;
+  });
+  
   const [selectedFunilId, setSelectedFunilId] = useState<string | null>(null);
+
+  // Sincronizar viewMode com localStorage
+  useEffect(() => {
+    localStorage.setItem(storageKey, viewMode);
+  }, [viewMode, storageKey]);
 
   // Filtrar funis baseado em funilIds (se fornecido)
   const availableFunis = funilIds
@@ -77,25 +91,25 @@ export const DashboardTemplate = ({
             </Select>
           )}
 
-          {/* Toggle Kanban / Lista */}
-          <div className="flex items-center gap-1 border rounded-lg p-1">
+          {/* Toggle Kanban / Lista - Visual Moderno */}
+          <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 border border-border/50">
             <Button
-              variant={viewMode === 'kanban' ? 'secondary' : 'ghost'}
+              variant={viewMode === 'kanban' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('kanban')}
-              className="gap-2"
+              className="gap-2 transition-all"
             >
               <LayoutGrid className="h-4 w-4" />
-              Kanban
+              <span className="hidden sm:inline">Kanban</span>
             </Button>
             <Button
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+              variant={viewMode === 'list' ? 'default' : 'ghost'}
               size="sm"
               onClick={() => setViewMode('list')}
-              className="gap-2"
+              className="gap-2 transition-all"
             >
               <List className="h-4 w-4" />
-              Lista
+              <span className="hidden sm:inline">Lista</span>
             </Button>
           </div>
         </div>
