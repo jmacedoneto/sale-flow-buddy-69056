@@ -8,6 +8,8 @@ export const useFunis = () => {
   return useQuery<Funil[]>({
     queryKey: ["funis"],
     queryFn: async () => {
+      // RLS agora filtra automaticamente baseado em user_funil_access
+      // Admins veem todos, outros usuários veem apenas funis permitidos
       const { data, error } = await (supabase as any)
         .from("funis")
         .select("*")
@@ -16,6 +18,7 @@ export const useFunis = () => {
       if (error) throw error;
       return (data || []) as Funil[];
     },
+    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 };
 

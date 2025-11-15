@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useFunis } from "@/hooks/useFunis";
 
 interface ConversionMetric {
   from: string;
@@ -36,8 +37,14 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 export default function DashboardComercial() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({ conv: [], funnel: [] });
   const [loading, setLoading] = useState(true);
+  const { data: funis = [] } = useFunis();
+
+  // Encontrar funil Comercial
+  const funilComercial = funis.find(f => f.nome === 'Comercial');
 
   useEffect(() => {
+    if (!funilComercial) return;
+    
     const fetchMetrics = async () => {
       try {
         // Query otimizada: agregar em uma única chamada
@@ -87,7 +94,7 @@ export default function DashboardComercial() {
     };
 
     fetchMetrics();
-  }, []);
+  }, [funilComercial]);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
