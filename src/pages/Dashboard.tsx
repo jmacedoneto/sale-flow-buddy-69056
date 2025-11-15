@@ -80,10 +80,13 @@ const Dashboard = () => {
     })
   );
 
-  // Auto-select first funil when loaded
-  if (funis && funis.length > 0 && !selectedFunilId) {
-    setSelectedFunilId(funis[0].id);
-  }
+  // Auto-select funil Comercial when loaded
+  useEffect(() => {
+    if (funis && funis.length > 0 && !selectedFunilId) {
+      const funilComercial = funis.find(f => f.nome === 'Comercial');
+      setSelectedFunilId(funilComercial?.id || funis[0].id);
+    }
+  }, [funis, selectedFunilId]);
 
   // Calcular estatísticas dinâmicas
   const [statsData, setStatsData] = useState({
@@ -304,55 +307,28 @@ const Dashboard = () => {
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-foreground">Dashboard CRM - Home</h1>
-              <p className="text-sm text-muted-foreground mt-1">Escolha um dashboard para visualizar</p>
+              <h1 className="text-2xl font-bold text-foreground">Dashboard CRM</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Visualização Kanban dos Funis
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link to="/dashboard-comercial">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <TrendingUp className="h-4 w-4" />
+                  Ver Métricas Comercial
+                </Button>
+              </Link>
+              <Link to="/dashboard-administrativo">
+                <Button variant="outline" size="sm" className="gap-2">
+                  <Users className="h-4 w-4" />
+                  Ver Métricas Administrativo
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
       </header>
-
-      <main className="container mx-auto px-6 py-8">
-        {/* Dashboard Selection Cards */}
-        <div className="grid gap-6 md:grid-cols-2 max-w-4xl mx-auto">
-          <Link to="/dashboard-comercial">
-            <Card className="hover:shadow-elegant transition-shadow cursor-pointer h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <TrendingUp className="h-5 w-5 text-primary" />
-                  Dashboard Comercial
-                </CardTitle>
-                <CardDescription>
-                  Visualize métricas e análises do funil de vendas Comercial
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Acompanhe conversões, distribuição de leads e performance das etapas do funil comercial.
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link to="/dashboard-administrativo">
-            <Card className="hover:shadow-elegant transition-shadow cursor-pointer h-full">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <Users className="h-5 w-5 text-primary" />
-                  Dashboard Administrativo
-                </CardTitle>
-                <CardDescription>
-                  Visualize métricas dos funis administrativos
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Acompanhe demandas de Eventos, Suporte e outras operações administrativas.
-                </p>
-              </CardContent>
-            </Card>
-          </Link>
-        </div>
-      </main>
 
       <main className="container mx-auto px-6 py-8">
         {/* Stats Grid */}
