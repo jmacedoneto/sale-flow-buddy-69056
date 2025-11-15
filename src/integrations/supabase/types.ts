@@ -301,6 +301,68 @@ export type Database = {
         }
         Relationships: []
       }
+      user_funil_access: {
+        Row: {
+          can_edit: boolean
+          can_view: boolean
+          created_at: string
+          funil_id: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          funil_id: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_edit?: boolean
+          can_view?: boolean
+          created_at?: string
+          funil_id?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_funil_access_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       users_crm: {
         Row: {
           approved: boolean | null
@@ -470,10 +532,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_access_funil: {
+        Args: { _funil_id: string; _require_edit?: boolean; _user_id: string }
+        Returns: boolean
+      }
       get_user_role: { Args: { _user_email: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "manager" | "agent" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -600,6 +673,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "manager", "agent", "viewer"],
+    },
   },
 } as const

@@ -6,6 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
+import { Shield, ExternalLink } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const MASTER_EMAIL = 'jmacedoneto1989@gmail.com';
 
@@ -125,9 +128,24 @@ export const AbaUsuarios = () => {
 
   return (
     <div className="space-y-6">
+      {/* Aviso sobre nova tela */}
+      <Alert>
+        <Shield className="h-4 w-4" />
+        <AlertTitle>Nova Gestão de Permissões Disponível</AlertTitle>
+        <AlertDescription className="flex items-center justify-between">
+          <span>Sistema completo de permissões por funil agora disponível!</span>
+          <Link to="/usuarios-permissoes">
+            <Button variant="outline" size="sm" className="gap-2">
+              Acessar Nova Tela
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </Link>
+        </AlertDescription>
+      </Alert>
+
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">👥 Usuários do Sistema</h2>
+          <h2 className="text-2xl font-bold">👥 Usuários do Sistema (Legacy)</h2>
           <p className="text-muted-foreground">Gerencie os usuários e suas permissões</p>
         </div>
       </div>

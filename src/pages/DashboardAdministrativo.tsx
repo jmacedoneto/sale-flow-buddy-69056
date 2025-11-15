@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { useFunis } from "@/hooks/useFunis";
 
 interface EtapaMetric {
   name: string;
@@ -40,8 +41,14 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 export default function DashboardAdministrativo() {
   const [metrics, setMetrics] = useState<DashboardMetrics>({ etapas: [], status: [] });
   const [loading, setLoading] = useState(true);
+  const { data: funis = [] } = useFunis();
+
+  // Encontrar funis administrativos (excluir Comercial)
+  const funisAdmin = funis.filter(f => f.nome !== 'Comercial');
 
   useEffect(() => {
+    if (funisAdmin.length === 0) return;
+    
     const fetchMetrics = async () => {
       try {
         // Query otimizada: buscar todos os cards dos funis admin de uma vez
@@ -88,7 +95,7 @@ export default function DashboardAdministrativo() {
     };
 
     fetchMetrics();
-  }, []);
+  }, [funisAdmin.length]);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">
