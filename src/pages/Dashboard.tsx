@@ -10,11 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, TestTube2 } from "lucide-react";
+import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, TestTube2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSearchParams, Link } from "react-router-dom";
 import { useFunis, useEtapas, useAllCardsForFunil, useMoveCard, type CardWithStatus } from "@/hooks/useFunis";
+import { useQueryClient } from "@tanstack/react-query";
 import { useCardsSemTarefa, useAgendarTarefasEmLote } from "@/hooks/useCardsSemTarefa";
 import { EtapaColumn } from "@/components/EtapaColumn";
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -27,6 +28,7 @@ import { EtapasModal } from "@/components/EtapasModal";
 import type { Funil } from "@/types/database";
 
 const Dashboard = () => {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedFunilId, setSelectedFunilId] = useState<string | null>(null);
   const [activeCard, setActiveCard] = useState<CardWithStatus | null>(null);
@@ -58,40 +60,59 @@ const Dashboard = () => {
     const cardId = searchParams.get('cardId');
     if (!cardId) return;
 
-    const card = allCards?.find(c => c.id === cardId);
+    // P0.1: Invalidar cache antes de buscar
+    console.log('[Dashboard] Invalidando cache para abrir card:', cardId);
+    queryClient.invalidateQueries({ queryKey: ['all_cards', selectedFunilId] });
 
-    if (card) {
-      setSelectedCard(card);
-      setIsModalOpen(true);
-      setSearchParams({});
-      return;
-    }
+    // P0.2: Limpar filtro para garantir visibilidade
+    setStatusFilter("todos");
 
-    // Fallback: buscar card direto do Supabase se não estiver em allCards
-    if (allCards) {
-      (async () => {
-        const { data, error } = await supabase
-          .from('cards_conversas')
-          .select('*')
-          .eq('id', cardId)
-          .maybeSingle();
+    // Aguardar um tick para React Query refetch
+    setTimeout(() => {
+      const card = allCards?.find(c => c.id === cardId);
 
-        if (data && !error) {
-          const statusInfo = data.data_retorno 
-            ? { status: 'restante' as const, variant: 'success' as const, label: '🟢 Tarefa agendada' }
-            : { status: 'sem' as const, variant: 'warning' as const, label: '⚠️ Sem Tarefa' };
-          
-          const fetchedCard: CardWithStatus = {
-            ...data,
-            statusInfo
-          };
-          setSelectedCard(fetchedCard);
-          setIsModalOpen(true);
-          setSearchParams({});
-        }
-      })();
-    }
-  }, [searchParams, allCards, setSearchParams]);
+      if (card) {
+        setSelectedCard(card);
+        setIsModalOpen(true);
+        setSearchParams({});
+        return;
+      }
+
+      // Fallback: buscar card direto do Supabase se não estiver em allCards
+      if (allCards !== undefined) {
+        (async () => {
+          const { data, error } = await supabase
+            .from('cards_conversas')
+            .select('*')
+            .eq('id', cardId)
+            .maybeSingle();
+
+          if (data && !error) {
+            const statusInfo = data.data_retorno 
+              ? { status: 'restante' as const, variant: 'success' as const, label: '🟢 Tarefa agendada' }
+              : { status: 'sem' as const, variant: 'warning' as const, label: '⚠️ Sem Tarefa' };
+            
+            const fetchedCard: CardWithStatus = {
+              ...data,
+              statusInfo
+            };
+            setSelectedCard(fetchedCard);
+            setIsModalOpen(true);
+            setSearchParams({});
+            
+            // P0.1: Invalidar novamente após fallback
+            queryClient.invalidateQueries({ queryKey: ['all_cards', selectedFunilId] });
+          } else {
+            // P2: Mensagem de erro
+            toast.error("Card não encontrado", {
+              description: "O card pode ter sido apagado ou você não tem permissão.",
+            });
+            setSearchParams({});
+          }
+        })();
+      }
+    }, 100); // Delay para permitir refetch
+  }, [searchParams, allCards, selectedFunilId, setSearchParams, queryClient]);
 
   // Resetar página ao mudar de funil
   useEffect(() => {
@@ -125,6 +146,22 @@ const Dashboard = () => {
       }
     }
   }, [funis, allCards, selectedFunilId, searchParams]);
+
+  // P3.2: Log de estado do Dashboard (apenas em desenvolvimento)
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Dashboard] Estado atual:', {
+        selectedFunilId,
+        totalCards: allCards?.length,
+        statusFilter,
+        sortOrder,
+        currentPage,
+        totalPages,
+        cardIdFromUrl: searchParams.get('cardId'),
+        isModalOpen,
+      });
+    }
+  }, [selectedFunilId, allCards, statusFilter, sortOrder, currentPage, totalPages, searchParams, isModalOpen]);
 
   // Calcular estatísticas dinâmicas
   const [statsData, setStatsData] = useState({
@@ -230,11 +267,17 @@ const Dashboard = () => {
   const getCardsForEtapa = (etapaId: string): CardWithStatus[] => {
     if (!allCards) return [];
     
-    let filtered = allCards.filter((card) => card.etapa_id === etapaId);
+    const totalNaEtapa = allCards.filter((card) => card.etapa_id === etapaId);
+    let filtered = [...totalNaEtapa];
 
     // Aplicar filtro de status
     if (statusFilter !== "todos") {
       filtered = filtered.filter((card) => card.statusInfo?.status === statusFilter);
+    }
+
+    // P1.3: Log quando filtro está escondendo cards
+    if (filtered.length < totalNaEtapa.length && process.env.NODE_ENV === 'development') {
+      console.log(`[getCardsForEtapa] Etapa ${etapaId}: ${filtered.length} de ${totalNaEtapa.length} cards visíveis (filtro: ${statusFilter})`);
     }
 
     // Aplicar ordenação
@@ -483,6 +526,29 @@ const Dashboard = () => {
           </Card>
         </div>
 
+        {/* P0.3: Badge de filtro ativo */}
+        {statusFilter !== "todos" && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Filtro ativo: <strong>
+                  {statusFilter === "sem" && "⚠️ Sem Tarefa"}
+                  {statusFilter === "restante" && "🟢 Restantes"}
+                  {statusFilter === "vencida" && "🔴 Vencidas"}
+                </strong> - alguns cards podem estar ocultos.
+              </span>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setStatusFilter("todos")}
+              >
+                Limpar Filtro
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {/* Funil Pipeline */}
         {selectedFunilId && (
           <Card className="shadow-card">
@@ -490,6 +556,20 @@ const Dashboard = () => {
               <CardTitle className="flex items-center justify-between">
                 Pipeline de Conversas
                 <div className="flex items-center gap-2">
+                  {/* P1.2: Botão manual de refresh */}
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => {
+                      console.log('[Dashboard] Refresh manual solicitado');
+                      queryClient.invalidateQueries({ queryKey: ['all_cards', selectedFunilId] });
+                      toast.success("Atualizando cards...");
+                    }}
+                    className="gap-2"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Atualizar
+                  </Button>
                   <Badge variant="secondary">
                     {totalCards} conversas
                   </Badge>
@@ -544,6 +624,7 @@ const Dashboard = () => {
                         etapaId={etapa.id}
                         nome={etapa.nome}
                         cards={getCardsForEtapa(etapa.id)}
+                        totalCards={allCards?.filter(c => c.etapa_id === etapa.id).length || 0}
                         onCardClick={handleCardClick}
                         onAgendarClick={handleAgendarCard}
                       />
