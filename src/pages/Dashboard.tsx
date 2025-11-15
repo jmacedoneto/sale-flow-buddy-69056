@@ -56,14 +56,40 @@ const Dashboard = () => {
   // Verificar se há cardId na URL e abrir modal
   useEffect(() => {
     const cardId = searchParams.get('cardId');
-    if (cardId && allCards) {
-      const card = allCards.find(c => c.id === cardId);
-      if (card) {
-        setSelectedCard(card);
-        setIsModalOpen(true);
-        // Limpar o parâmetro da URL
-        setSearchParams({});
-      }
+    if (!cardId) return;
+
+    const card = allCards?.find(c => c.id === cardId);
+
+    if (card) {
+      setSelectedCard(card);
+      setIsModalOpen(true);
+      setSearchParams({});
+      return;
+    }
+
+    // Fallback: buscar card direto do Supabase se não estiver em allCards
+    if (allCards) {
+      (async () => {
+        const { data, error } = await supabase
+          .from('cards_conversas')
+          .select('*')
+          .eq('id', cardId)
+          .maybeSingle();
+
+        if (data && !error) {
+          const statusInfo = data.data_retorno 
+            ? { status: 'restante' as const, variant: 'success' as const, label: '🟢 Tarefa agendada' }
+            : { status: 'sem' as const, variant: 'warning' as const, label: '⚠️ Sem Tarefa' };
+          
+          const fetchedCard: CardWithStatus = {
+            ...data,
+            statusInfo
+          };
+          setSelectedCard(fetchedCard);
+          setIsModalOpen(true);
+          setSearchParams({});
+        }
+      })();
     }
   }, [searchParams, allCards, setSearchParams]);
 
@@ -82,11 +108,23 @@ const Dashboard = () => {
 
   // Auto-select funil Comercial when loaded
   useEffect(() => {
-    if (funis && funis.length > 0 && !selectedFunilId) {
+    if (!funis || funis.length === 0) return;
+
+    // Se ainda não há funil selecionado, usa Comercial como padrão
+    if (!selectedFunilId) {
       const funilComercial = funis.find(f => f.nome === 'Comercial');
       setSelectedFunilId(funilComercial?.id || funis[0].id);
     }
-  }, [funis, selectedFunilId]);
+
+    // Se veio um cardId na URL, tentar alinhar o funil
+    const cardIdFromUrl = searchParams.get('cardId');
+    if (cardIdFromUrl && allCards) {
+      const card = allCards.find(c => c.id === cardIdFromUrl);
+      if (card && card.funil_id && card.funil_id !== selectedFunilId) {
+        setSelectedFunilId(card.funil_id);
+      }
+    }
+  }, [funis, allCards, selectedFunilId, searchParams]);
 
   // Calcular estatísticas dinâmicas
   const [statsData, setStatsData] = useState({

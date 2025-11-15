@@ -86,7 +86,8 @@ export const LogDetalheDrawer = ({ logId, open, onClose }: LogDetalheDrawerProps
 
   const openCard = () => {
     if (!log?.card_id) return;
-    navigate(`/?card=${log.card_id}`);
+    console.log('[Navigation] Abrindo card via LogDetalheDrawer:', log.card_id, 'log:', log.id);
+    navigate(`/dashboard?cardId=${log.card_id}`);
     onClose();
   };
 
