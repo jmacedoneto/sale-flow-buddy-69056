@@ -90,7 +90,7 @@ export const ConversaCard = ({
       style={style}
       {...attributes}
       {...listeners}
-      className="p-4 cursor-grab active:cursor-grabbing hover:shadow-md transition-all bg-gradient-card border-border group"
+      className="p-4 cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 transition-all duration-200 bg-gradient-card border-border group"
       onClick={handleClick}
     >
       <div className="space-y-2">
