@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info } from "lucide-react";
+import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info, Sparkles } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CardDetailsModalProps {
   card: CardConversa | null;
@@ -42,6 +43,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   const [novaNota, setNovaNota] = useState("");
   const [funilId, setFunilId] = useState<string>("");
   const [etapaId, setEtapaId] = useState<string>("");
+  const [isGeneratingResumo, setIsGeneratingResumo] = useState(false);
   const [dataRetorno, setDataRetorno] = useState<Date | undefined>(
     new Date(Date.now() + 7 * 86400000)
   );
@@ -143,6 +145,33 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
         },
       }
     );
+  };
+
+  const handleGerarResumo = async () => {
+    if (!card?.chatwoot_conversa_id) {
+      toast.error("Card não possui conversa vinculada");
+      return;
+    }
+
+    setIsGeneratingResumo(true);
+    try {
+      const { data, error } = await (supabase as any).functions.invoke('ai-resumo-comercial', {
+        body: {
+          conversationId: card.chatwoot_conversa_id,
+          cardId: card.id,
+        },
+      });
+
+      if (error) throw error;
+
+      setResumoComercial(data.resumo);
+      toast.success("Resumo comercial gerado com sucesso!");
+    } catch (error: any) {
+      console.error("Erro ao gerar resumo:", error);
+      toast.error(error.message || "Erro ao gerar resumo comercial");
+    } finally {
+      setIsGeneratingResumo(false);
+    }
   };
 
   if (!card) return null;
@@ -388,7 +417,18 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                   </div>
 
                   <div>
-                    <Label>Resumo Comercial</Label>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>Resumo Comercial</Label>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleGerarResumo}
+                        disabled={isGeneratingResumo || !card.chatwoot_conversa_id}
+                      >
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        {isGeneratingResumo ? "Gerando..." : "Gerar com IA"}
+                      </Button>
+                    </div>
                     <Textarea
                       value={resumoComercial}
                       onChange={(e) => setResumoComercial(e.target.value)}

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useRealtimeErrorAlerts } from "@/hooks/useRealtimeErrorAlerts";
+import { AIChat } from "@/components/AIChat";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Pending from "./pages/Pending";
@@ -23,8 +24,10 @@ const AppContent = () => {
   useRealtimeErrorAlerts(); // Ativa monitoramento de erros em tempo real
   
   return (
-    <BrowserRouter>
-      <Routes>
+    <>
+      <AIChat />
+      <BrowserRouter>
+        <Routes>
         <Route path="/auth" element={<Auth />} />
         <Route path="/pending" element={<Pending />} />
         <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -35,8 +38,9 @@ const AppContent = () => {
         <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
         <Route path="/usuarios-permissoes" element={<ProtectedRoute><UsuariosPermissoes /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </BrowserRouter>
+        </Routes>
+      </BrowserRouter>
+    </>
   );
 };
 
