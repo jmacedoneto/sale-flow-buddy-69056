@@ -2,3 +2,6 @@ project_id = "sjrmpojssvfgquroywys"
 
 [functions.dispatcher-multi]
 verify_jwt = false
+
+[functions.chatwoot-text-commands]
+verify_jwt = false
