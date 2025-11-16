@@ -561,7 +561,9 @@ export type Database = {
           edit_funil: boolean | null
           editar_card: boolean | null
           email: string
+          gerenciar_usuarios: boolean | null
           id: string
+          mover_etapa: boolean | null
           nome: string | null
           role: string | null
           updated_at: string | null
@@ -577,7 +579,9 @@ export type Database = {
           edit_funil?: boolean | null
           editar_card?: boolean | null
           email: string
+          gerenciar_usuarios?: boolean | null
           id?: string
+          mover_etapa?: boolean | null
           nome?: string | null
           role?: string | null
           updated_at?: string | null
@@ -593,7 +597,9 @@ export type Database = {
           edit_funil?: boolean | null
           editar_card?: boolean | null
           email?: string
+          gerenciar_usuarios?: boolean | null
           id?: string
+          mover_etapa?: boolean | null
           nome?: string | null
           role?: string | null
           updated_at?: string | null
