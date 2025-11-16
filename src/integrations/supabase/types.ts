@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_config: {
+        Row: {
+          created_at: string
+          id: string
+          prompt_assistente_global: string
+          prompt_resumo_comercial: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          prompt_assistente_global?: string
+          prompt_resumo_comercial?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          prompt_assistente_global?: string
+          prompt_resumo_comercial?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       atividades_cards: {
         Row: {
           card_id: string
