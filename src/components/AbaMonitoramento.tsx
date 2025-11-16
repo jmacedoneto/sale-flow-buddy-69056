@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useWebhookLogs, useWebhookStats, useCleanOldLogs } from "@/hooks/useWebhookLogs";
 import { LogDetalheDrawer } from "@/components/LogDetalheDrawer";
 import { 
@@ -17,16 +18,25 @@ import {
   RefreshCw,
   ArrowRight,
   ArrowLeft,
-  Eye
+  Eye,
+  Download,
+  Filter
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const AbaMonitoramento = () => {
   const [page, setPage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [syncTypeFilter, setSyncTypeFilter] = useState<string>("all");
   const [timeFilter, setTimeFilter] = useState<string>("all");
+  const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
   const filters = {
@@ -38,6 +48,54 @@ export const AbaMonitoramento = () => {
   const { data: logsData, isLoading: logsLoading, refetch } = useWebhookLogs(page, filters);
   const { data: stats, isLoading: statsLoading } = useWebhookStats();
   const cleanLogs = useCleanOldLogs();
+
+  // Filtrar logs por busca
+  const filteredLogs = logsData?.logs?.filter((log: any) => {
+    if (!searchTerm) return true;
+    const searchNum = parseInt(searchTerm);
+    if (!isNaN(searchNum)) {
+      return log.conversation_id === searchNum;
+    }
+    return log.card_id?.includes(searchTerm);
+  }) || [];
+
+  // Export functions
+  const handleExportJSON = () => {
+    const dataStr = JSON.stringify(filteredLogs, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `webhook-logs-${new Date().toISOString()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportCSV = () => {
+    const headers = ['ID', 'Tipo de Sync', 'Status', 'Evento', 'Conversa ID', 'Card ID', 'Erro', 'Latência (ms)', 'Data/Hora'];
+    const rows = filteredLogs.map((log: any) => [
+      log.id,
+      log.sync_type,
+      log.status,
+      log.event_type || '',
+      log.conversation_id?.toString() || '',
+      log.card_id || '',
+      log.error_message || '',
+      log.latency_ms?.toString() || '',
+      new Date(log.created_at).toLocaleString('pt-BR')
+    ]);
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+    const dataBlob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `webhook-logs-${new Date().toISOString()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -180,6 +238,30 @@ export const AbaMonitoramento = () => {
                 <SelectItem value="168">Última semana</SelectItem>
               </SelectContent>
             </Select>
+
+            <Input
+              placeholder="Buscar por Conversa ID ou Card ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 min-w-[200px]"
+            />
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={filteredLogs.length === 0}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={handleExportJSON}>
+                  Exportar como JSON
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCSV}>
+                  Exportar como CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             <div className="flex-1" />
 
