@@ -24,10 +24,9 @@ const AppContent = () => {
   useRealtimeErrorAlerts(); // Ativa monitoramento de erros em tempo real
   
   return (
-    <>
+    <BrowserRouter>
       <AIChat />
-      <BrowserRouter>
-        <Routes>
+      <Routes>
         <Route path="/auth" element={<Auth />} />
         <Route path="/pending" element={<Pending />} />
         <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
@@ -38,9 +37,8 @@ const AppContent = () => {
         <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
         <Route path="/usuarios-permissoes" element={<ProtectedRoute><UsuariosPermissoes /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </>
+      </Routes>
+    </BrowserRouter>
   );
 };
 
