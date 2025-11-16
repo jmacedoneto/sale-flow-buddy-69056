@@ -15,6 +15,7 @@ import DashboardAdministrativo from "./pages/DashboardAdministrativo";
 import Atividades from "./pages/Atividades";
 import Configuracoes from "./pages/Configuracoes";
 import UsuariosPermissoes from "./pages/UsuariosPermissoes";
+import NegociacoesPausadas from "./pages/NegociacoesPausadas";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const AppContent = () => {
         <Route path="/atividades" element={<ProtectedRoute><Atividades /></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
         <Route path="/usuarios-permissoes" element={<ProtectedRoute><UsuariosPermissoes /></ProtectedRoute>} />
+        <Route path="/negociacoes-pausadas" element={<ProtectedRoute><NegociacoesPausadas /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

@@ -19,6 +19,10 @@ export interface CardConversa {
   descricao_detalhada?: string | null;
   resumo_comercial?: string | null;
   etapa_id?: string;
+  status?: string;
+  pausado?: boolean;
+  motivo_perda_id?: string | null;
+  valor_total?: number;
 }
 
 export interface Funil {
