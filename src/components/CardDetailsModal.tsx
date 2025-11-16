@@ -82,14 +82,36 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
       funil_id: funilId || null,
       funil_nome: funilNome,
       funil_etapa: funilEtapa,
+      etapa_id: etapaId || null,
       data_retorno: dataRetorno ? format(dataRetorno, "yyyy-MM-dd") : null,
     };
+
+    // Detectar se mudou funil ou etapa para sync com Chatwoot
+    const changedFunilOrEtapa = 
+      (funilNome !== card.funil_nome) || 
+      (funilEtapa !== card.funil_etapa);
 
     updateCard.mutate(
       { id: card.id, updates },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           toast.success("Card atualizado com sucesso!");
+          
+          // Se mudou funil/etapa E tem conversation_id, sincronizar com Chatwoot
+          if (changedFunilOrEtapa && card.chatwoot_conversa_id) {
+            try {
+              const { syncCardToChatwoot } = await import("@/services/cardSyncService");
+              await syncCardToChatwoot({
+                conversationId: card.chatwoot_conversa_id,
+                label: funilNome || undefined,
+                etapaComercial: funilEtapa || undefined,
+              });
+              console.log('[CardDetailsModal] Sync com Chatwoot realizado');
+            } catch (syncError) {
+              console.error('[CardDetailsModal] Erro ao sincronizar com Chatwoot:', syncError);
+              // Não mostrar erro ao usuário, apenas logar
+            }
+          }
         },
         onError: (error) => {
           console.error("Erro ao atualizar card:", error);
@@ -105,8 +127,10 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     createAtividade.mutate(
       {
         cardId: card.id,
-        tipo: "nota",
+        tipo: "NOTA",
         descricao: novaNota,
+        sendToChatwoot: true,
+        conversationId: card.chatwoot_conversa_id || undefined,
       },
       {
         onSuccess: () => {

@@ -29,23 +29,46 @@ export const useCreateAtividade = () => {
     mutationFn: async ({ 
       cardId, 
       tipo, 
-      descricao 
+      descricao,
+      sendToChatwoot = false,
+      conversationId,
     }: { 
       cardId: string; 
       tipo: string; 
       descricao: string;
+      sendToChatwoot?: boolean;
+      conversationId?: number;
     }) => {
+      // 1. Criar atividade no CRM
       const { data, error } = await (supabase as any)
         .from("atividades_cards")
         .insert({
           card_id: cardId,
           tipo,
           descricao,
+          privado: sendToChatwoot, // marcar como privada se vai para Chatwoot
         })
         .select()
         .single();
       
       if (error) throw error;
+
+      // 2. Se sendToChatwoot = true, enviar private note ao Chatwoot
+      if (sendToChatwoot && conversationId) {
+        try {
+          const { sendChatwootMessage } = await import("@/services/chatwootMessagingService");
+          await sendChatwootMessage({
+            conversationId,
+            content: `📝 ${tipo}: ${descricao}`,
+            private: true,
+          });
+          console.log('[useCreateAtividade] Private note enviada ao Chatwoot');
+        } catch (chatwootError) {
+          // Log mas não falhar toda a operação
+          console.error('[useCreateAtividade] Erro ao enviar private note:', chatwootError);
+        }
+      }
+
       return data as AtividadeCard;
     },
     onSuccess: () => {

@@ -86,12 +86,16 @@ export const usePermissions = () => {
 
   const canViewFunil = (funilId: string): boolean => {
     if (hasRole('admin')) return true;
-    return allowedFunilIds.includes(funilId);
+    const hasAccess = allowedFunilIds.includes(funilId);
+    console.log('[usePermissions] canViewFunil:', { funilId, hasAccess, allowedFunilIds });
+    return hasAccess;
   };
 
   const canEditFunil = (funilId: string): boolean => {
     if (hasRole('admin')) return true;
-    return editableFunilIds.includes(funilId);
+    const hasAccess = editableFunilIds.includes(funilId);
+    console.log('[usePermissions] canEditFunil:', { funilId, hasAccess, editableFunilIds });
+    return hasAccess;
   };
 
   const canManageUsers = (): boolean => {

@@ -79,14 +79,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    const nomeFunil = customAttributes?.nome_do_funil;
-    const funilEtapa = customAttributes?.funil_etapa;
+    const nomeFunil = customAttributes?.nome_do_funil || customAttributes?.label;
+    const funilEtapa = customAttributes?.funil_etapa || customAttributes?.etapa_comercial;
     const dataRetorno = customAttributes?.data_retorno;
 
     console.log('[webhook-dispatcher] Processando conversa:', conversationId, {
       nomeFunil,
       funilEtapa,
       dataRetorno,
+      allCustomAttributes: customAttributes,
     });
 
     // Buscar card existente
@@ -100,34 +101,49 @@ Deno.serve(async (req) => {
       // Atualizar card existente
       console.log('[webhook-dispatcher] Atualizando card existente:', existingCard.id);
 
-      // Buscar funil e etapa por nome
+      // Buscar funil por nome (suporta tanto label quanto nome_do_funil)
       let funilId = existingCard.funil_id;
       let etapaId = existingCard.etapa_id;
 
       if (nomeFunil) {
+        console.log('[webhook-dispatcher] Buscando funil:', nomeFunil);
         const { data: funil } = await supabase
           .from('funis')
-          .select('id')
-          .eq('nome', nomeFunil)
+          .select('id, nome')
+          .ilike('nome', nomeFunil) // case-insensitive
           .maybeSingle();
         
         if (funil) {
+          console.log('[webhook-dispatcher] Funil encontrado:', funil);
           funilId = funil.id;
+        } else {
+          console.warn('[webhook-dispatcher] Funil não encontrado:', nomeFunil);
         }
       }
 
       if (funilEtapa && funilId) {
+        console.log('[webhook-dispatcher] Buscando etapa:', { funilId, funilEtapa });
         const { data: etapa } = await supabase
           .from('etapas')
-          .select('id')
+          .select('id, nome')
           .eq('funil_id', funilId)
-          .eq('nome', funilEtapa)
+          .ilike('nome', funilEtapa) // case-insensitive
           .maybeSingle();
         
         if (etapa) {
+          console.log('[webhook-dispatcher] Etapa encontrada:', etapa);
           etapaId = etapa.id;
+        } else {
+          console.warn('[webhook-dispatcher] Etapa não encontrada:', { funilId, funilEtapa });
         }
       }
+
+      console.log('[webhook-dispatcher] Atualizando card com:', {
+        funilId,
+        etapaId,
+        nomeFunil,
+        funilEtapa,
+      });
 
       const { error: updateError } = await supabase
         .from('cards_conversas')
