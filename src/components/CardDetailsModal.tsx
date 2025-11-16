@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info, Sparkles } from "lucide-react";
+import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info, Sparkles, Trophy, X, Pause } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { ModalMotivoPerda } from "./ModalMotivoPerda";
+import { CardProdutosManager } from "./CardProdutosManager";
 
 interface CardDetailsModalProps {
   card: CardConversa | null;
@@ -44,6 +46,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   const [funilId, setFunilId] = useState<string>("");
   const [etapaId, setEtapaId] = useState<string>("");
   const [isGeneratingResumo, setIsGeneratingResumo] = useState(false);
+  const [modalPerdaOpen, setModalPerdaOpen] = useState(false);
   const [dataRetorno, setDataRetorno] = useState<Date | undefined>(
     new Date(Date.now() + 7 * 86400000)
   );
@@ -174,6 +177,74 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     }
   };
 
+  const handleMarcarGanho = async () => {
+    if (!card || !etapas) return;
+    
+    const ultimaEtapa = etapas[etapas.length - 1];
+    
+    updateCard.mutate(
+      {
+        id: card.id,
+        updates: {
+          status: 'ganho',
+          etapa_id: ultimaEtapa?.id || card.etapa_id,
+          funil_etapa: ultimaEtapa?.nome || card.funil_etapa,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Venda marcada como ganha! 🎉");
+          onOpenChange(false);
+        },
+      }
+    );
+  };
+
+  const handleMarcarPerda = (motivoId: string, observacao?: string) => {
+    if (!card) return;
+    
+    updateCard.mutate(
+      {
+        id: card.id,
+        updates: {
+          status: 'perdido',
+          motivo_perda_id: motivoId,
+          descricao_detalhada: observacao
+            ? `${card.descricao_detalhada || ''}\n\nMotivo da perda: ${observacao}`.trim()
+            : card.descricao_detalhada,
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success("Venda marcada como perdida");
+          setModalPerdaOpen(false);
+          onOpenChange(false);
+        },
+      }
+    );
+  };
+
+  const handlePausar = () => {
+    if (!card) return;
+    
+    const novoPausado = !card.pausado;
+    
+    updateCard.mutate(
+      {
+        id: card.id,
+        updates: {
+          pausado: novoPausado,
+          status: novoPausado ? 'pausado' : 'em_andamento',
+        },
+      },
+      {
+        onSuccess: () => {
+          toast.success(novoPausado ? "Negociação pausada" : "Negociação retomada");
+        },
+      }
+    );
+  };
+
   if (!card) return null;
 
   return (
@@ -205,10 +276,24 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                 )}
               </div>
             </div>
-            <Button onClick={handleSave} disabled={updateCard.isPending} className="shrink-0">
-              <Save className="h-4 w-4 mr-2" />
-              Salvar
-            </Button>
+            <div className="flex gap-2 shrink-0">
+              <Button onClick={handleMarcarGanho} variant="default" size="sm" className="bg-success hover:bg-success/90">
+                <Trophy className="h-4 w-4 mr-1" />
+                Ganhou
+              </Button>
+              <Button onClick={() => setModalPerdaOpen(true)} variant="destructive" size="sm">
+                <X className="h-4 w-4 mr-1" />
+                Perdeu
+              </Button>
+              <Button onClick={handlePausar} variant="secondary" size="sm">
+                <Pause className="h-4 w-4 mr-1" />
+                {card.pausado ? "Retomar" : "Pausar"}
+              </Button>
+              <Button onClick={handleSave} disabled={updateCard.isPending}>
+                <Save className="h-4 w-4 mr-2" />
+                Salvar
+              </Button>
+            </div>
           </div>
         </SheetHeader>
 
@@ -416,6 +501,16 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                     />
                   </div>
 
+                  <Separator />
+
+                  {/* Produtos */}
+                  <div>
+                    <Label className="text-base font-semibold mb-3 block">Produtos</Label>
+                    <CardProdutosManager cardId={card.id} />
+                  </div>
+
+                  <Separator />
+
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <Label>Resumo Comercial</Label>
@@ -442,6 +537,12 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
           </ScrollArea>
         </div>
       </SheetContent>
+      
+      <ModalMotivoPerda
+        open={modalPerdaOpen}
+        onOpenChange={setModalPerdaOpen}
+        onConfirm={handleMarcarPerda}
+      />
     </Sheet>
   );
 };

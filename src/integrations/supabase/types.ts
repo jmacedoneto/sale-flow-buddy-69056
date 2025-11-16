@@ -91,6 +91,48 @@ export type Database = {
           },
         ]
       }
+      card_produtos: {
+        Row: {
+          card_id: string
+          created_at: string | null
+          id: string
+          produto_id: string
+          quantidade: number | null
+          valor: number
+        }
+        Insert: {
+          card_id: string
+          created_at?: string | null
+          id?: string
+          produto_id: string
+          quantidade?: number | null
+          valor: number
+        }
+        Update: {
+          card_id?: string
+          created_at?: string | null
+          id?: string
+          produto_id?: string
+          quantidade?: number | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "card_produtos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "card_produtos_produto_id_fkey"
+            columns: ["produto_id"]
+            isOneToOne: false
+            referencedRelation: "produtos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cards_conversas: {
         Row: {
           assigned_to: string | null
@@ -103,12 +145,16 @@ export type Database = {
           funil_id: string | null
           funil_nome: string | null
           id: string
+          motivo_perda_id: string | null
+          pausado: boolean | null
           prazo: string | null
           prioridade: string | null
           resumo: string | null
           resumo_comercial: string | null
+          status: string | null
           titulo: string
           updated_at: string
+          valor_total: number | null
         }
         Insert: {
           assigned_to?: string | null
@@ -121,12 +167,16 @@ export type Database = {
           funil_id?: string | null
           funil_nome?: string | null
           id?: string
+          motivo_perda_id?: string | null
+          pausado?: boolean | null
           prazo?: string | null
           prioridade?: string | null
           resumo?: string | null
           resumo_comercial?: string | null
+          status?: string | null
           titulo: string
           updated_at?: string
+          valor_total?: number | null
         }
         Update: {
           assigned_to?: string | null
@@ -139,12 +189,16 @@ export type Database = {
           funil_id?: string | null
           funil_nome?: string | null
           id?: string
+          motivo_perda_id?: string | null
+          pausado?: boolean | null
           prazo?: string | null
           prioridade?: string | null
           resumo?: string | null
           resumo_comercial?: string | null
+          status?: string | null
           titulo?: string
           updated_at?: string
+          valor_total?: number | null
         }
         Relationships: [
           {
@@ -166,6 +220,13 @@ export type Database = {
             columns: ["funil_id"]
             isOneToOne: false
             referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_motivo_perda"
+            columns: ["motivo_perda_id"]
+            isOneToOne: false
+            referencedRelation: "motivos_perda"
             referencedColumns: ["id"]
           },
         ]
@@ -304,6 +365,30 @@ export type Database = {
         }
         Relationships: []
       }
+      motivos_perda: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          id: string
+          nome: string
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       permissions: {
         Row: {
           criar_card: boolean | null
@@ -340,6 +425,33 @@ export type Database = {
           role?: string
           ver_dashboard?: boolean | null
           ver_relatorios?: boolean | null
+        }
+        Relationships: []
+      }
+      produtos: {
+        Row: {
+          ativo: boolean | null
+          created_at: string | null
+          id: string
+          nome: string
+          updated_at: string | null
+          valor_padrao: number | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          updated_at?: string | null
+          valor_padrao?: number | null
+        }
+        Update: {
+          ativo?: boolean | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          updated_at?: string | null
+          valor_padrao?: number | null
         }
         Relationships: []
       }

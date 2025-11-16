@@ -9,6 +9,7 @@ interface EtapaColumnProps {
   nome: string;
   cards: CardWithStatus[];
   totalCards?: number;
+  totalValor?: number; // Soma dos valores dos cards nesta etapa
   onCardClick?: (card: CardWithStatus) => void;
   onAgendarClick?: (card: CardWithStatus) => void;
   stageColor?: string; // Cor da etapa para visual moderno
@@ -19,7 +20,8 @@ export const EtapaColumn = ({
   etapaId, 
   nome, 
   cards, 
-  totalCards, 
+  totalCards,
+  totalValor = 0,
   onCardClick, 
   onAgendarClick,
   stageColor,
@@ -52,25 +54,35 @@ export const EtapaColumn = ({
         borderTopColor: borderColor,
       }}
     >
-      <div className="flex items-center justify-between sticky top-0 bg-muted/30 pb-2 border-b border-border/30">
-        <h3 className="font-semibold text-foreground flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: borderColor }}></span>
-          {nome}
-        </h3>
-        <Badge 
-          variant="secondary" 
-          className="text-xs font-semibold"
-          style={{ 
-            backgroundColor: `${borderColor}20`,
-            color: borderColor,
-            borderColor: borderColor
-          }}
-        >
-          {cards.length}
-          {totalCards && totalCards > cards.length && (
-            <span className="ml-1 opacity-70">/ {totalCards}</span>
-          )}
-        </Badge>
+      <div className="flex flex-col gap-2 sticky top-0 bg-muted/30 pb-2 border-b border-border/30">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-foreground flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: borderColor }}></span>
+            {nome}
+          </h3>
+          <Badge 
+            variant="secondary" 
+            className="text-xs font-semibold"
+            style={{ 
+              backgroundColor: `${borderColor}20`,
+              color: borderColor,
+              borderColor: borderColor
+            }}
+          >
+            {cards.length}
+            {totalCards && totalCards > cards.length && (
+              <span className="ml-1 opacity-70">/ {totalCards}</span>
+            )}
+          </Badge>
+        </div>
+        {totalValor > 0 && (
+          <div className="text-sm font-medium text-foreground">
+            {new Intl.NumberFormat('pt-BR', {
+              style: 'currency',
+              currency: 'BRL'
+            }).format(totalValor)}
+          </div>
+        )}
       </div>
       
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
