@@ -3,23 +3,34 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import type { AtividadeCard } from "@/types/database";
 
-export const useAtividades = (cardId: string | null) => {
-  return useQuery<AtividadeCard[]>({
-    queryKey: ["atividades", cardId],
+export const useAtividades = (cardId?: string | null) => {
+  const query = useQuery<AtividadeCard[]>({
+    queryKey: cardId ? ["atividades", cardId] : ["atividades"],
     queryFn: async () => {
-      if (!cardId) return [];
-      
-      const { data, error } = await (supabase as any)
+      let queryBuilder = (supabase as any)
         .from("atividades_cards")
         .select("*")
-        .eq("card_id", cardId)
         .order("data_criacao", { ascending: false });
+      
+      // Filtrar por card_id se fornecido
+      if (cardId) {
+        queryBuilder = queryBuilder.eq("card_id", cardId);
+      }
+      
+      const { data, error } = await queryBuilder;
       
       if (error) throw error;
       return (data || []) as AtividadeCard[];
     },
-    enabled: !!cardId,
+    enabled: cardId !== null, // Permite consulta sem cardId
   });
+
+  return {
+    atividades: query.data || [],
+    loading: query.isLoading,
+    error: query.error,
+    refetch: query.refetch,
+  };
 };
 
 export const useCreateAtividade = () => {

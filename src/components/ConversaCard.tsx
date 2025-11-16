@@ -7,6 +7,8 @@ import { ptBR } from "date-fns/locale";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { StatusInfo } from "@/services/cardStatusService";
+import { FollowUpInline } from "./FollowUpInline";
+import { useState } from "react";
 
 interface ConversaCardProps {
   id: string;
@@ -17,6 +19,7 @@ interface ConversaCardProps {
   statusInfo: StatusInfo;
   onClick?: () => void;
   onAgendarClick?: () => void;
+  onFollowUpCreated?: () => void;
 }
 
 export const ConversaCard = ({
@@ -28,7 +31,10 @@ export const ConversaCard = ({
   statusInfo,
   onClick,
   onAgendarClick,
+  onFollowUpCreated,
 }: ConversaCardProps) => {
+  const [showFollowUp, setShowFollowUp] = useState(false);
+  
   const {
     attributes,
     listeners,
@@ -128,6 +134,30 @@ export const ConversaCard = ({
         </div>
 
         {renderStatusBadge()}
+        
+        <div className="pt-2">
+          {showFollowUp ? (
+            <FollowUpInline 
+              cardId={id} 
+              onSuccess={() => {
+                setShowFollowUp(false);
+                onFollowUpCreated?.();
+              }}
+            />
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFollowUp(true);
+              }}
+              className="w-full text-xs"
+            >
+              + Criar Follow-up
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   );

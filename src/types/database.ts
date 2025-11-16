@@ -43,6 +43,11 @@ export interface AtividadeCard {
   tipo: string;
   descricao: string;
   data_criacao: string;
+  user_id?: string;
+  status: string;
+  observacao?: string;
+  data_prevista?: string;
+  data_conclusao?: string;
 }
 
 export interface IntegracaoChatwoot {

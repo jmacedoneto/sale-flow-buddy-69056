@@ -49,7 +49,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   );
   
   const updateCard = useUpdateCard();
-  const { data: atividades, isLoading: isLoadingAtividades } = useAtividades(card?.id || null);
+  const { atividades, loading: isLoadingAtividades } = useAtividades(card?.id || null);
   const createAtividade = useCreateAtividade();
   const { data: funis } = useFunis();
   const { data: etapas } = useEtapas(funilId || null);
