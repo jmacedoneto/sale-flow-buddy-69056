@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  },
+  "exclude": [
+    "node_modules",
+    "public",
+    "src",
+    ".env",
+    "package.json",
+    "package-lock.json"
+  ]
+}
