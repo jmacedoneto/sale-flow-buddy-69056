@@ -133,6 +133,7 @@ export type Database = {
       }
       etapas: {
         Row: {
+          cor: string | null
           created_at: string
           funil_id: string
           id: string
@@ -141,6 +142,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          cor?: string | null
           created_at?: string
           funil_id: string
           id?: string
@@ -149,6 +151,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          cor?: string | null
           created_at?: string
           funil_id?: string
           id?: string
