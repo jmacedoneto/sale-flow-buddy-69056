@@ -91,6 +91,44 @@ export type Database = {
           },
         ]
       }
+      audit_trail: {
+        Row: {
+          campo_alterado: string
+          card_id: string
+          created_at: string
+          id: string
+          user_id: string | null
+          valor_anterior: string | null
+          valor_novo: string | null
+        }
+        Insert: {
+          campo_alterado: string
+          card_id: string
+          created_at?: string
+          id?: string
+          user_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Update: {
+          campo_alterado?: string
+          card_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string | null
+          valor_anterior?: string | null
+          valor_novo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_trail_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards_conversas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       card_produtos: {
         Row: {
           card_id: string
@@ -151,6 +189,7 @@ export type Database = {
           prioridade: string | null
           resumo: string | null
           resumo_comercial: string | null
+          sla_vencimento: string | null
           status: string | null
           titulo: string
           updated_at: string
@@ -173,6 +212,7 @@ export type Database = {
           prioridade?: string | null
           resumo?: string | null
           resumo_comercial?: string | null
+          sla_vencimento?: string | null
           status?: string | null
           titulo: string
           updated_at?: string
@@ -195,6 +235,7 @@ export type Database = {
           prioridade?: string | null
           resumo?: string | null
           resumo_comercial?: string | null
+          sla_vencimento?: string | null
           status?: string | null
           titulo?: string
           updated_at?: string
@@ -362,6 +403,39 @@ export type Database = {
           lovable_funil?: string | null
           ordem?: number | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      message_templates: {
+        Row: {
+          atalho: string | null
+          ativo: boolean | null
+          conteudo: string
+          created_at: string
+          id: string
+          titulo: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          atalho?: string | null
+          ativo?: boolean | null
+          conteudo: string
+          created_at?: string
+          id?: string
+          titulo: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          atalho?: string | null
+          ativo?: boolean | null
+          conteudo?: string
+          created_at?: string
+          id?: string
+          titulo?: string
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }
