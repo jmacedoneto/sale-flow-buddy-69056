@@ -301,6 +301,39 @@ export type Database = {
         }
         Relationships: []
       }
+      system_health: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          last_checked: string
+          response_time_ms: number | null
+          service: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_checked?: string
+          response_time_ms?: number | null
+          service: string
+          status: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          last_checked?: string
+          response_time_ms?: number | null
+          service?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       user_funil_access: {
         Row: {
           can_edit: boolean
