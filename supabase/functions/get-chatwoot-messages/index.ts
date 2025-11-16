@@ -92,12 +92,21 @@ async function fetchConversationMessages(
       }
     }
 
-    const data: ChatwootMessage[] = await response.json();
+    const data = await response.json();
     console.log(`[get-chatwoot-messages] === SUCESSO ===`);
-    console.log(`[get-chatwoot-messages] ${data.length} mensagens encontradas`);
-    console.log(`[get-chatwoot-messages] Payload (primeiras 2 mensagens):`, JSON.stringify(data.slice(0, 2), null, 2));
+    console.log(`[get-chatwoot-messages] Tipo de resposta:`, typeof data);
+    console.log(`[get-chatwoot-messages] É array?:`, Array.isArray(data));
+    console.log(`[get-chatwoot-messages] Payload completo (sample):`, JSON.stringify(data).substring(0, 500));
+    
+    // A API do Chatwoot retorna um array diretamente
+    const messages: ChatwootMessage[] = Array.isArray(data) ? data : [];
+    console.log(`[get-chatwoot-messages] ${messages.length} mensagens encontradas`);
+    
+    if (messages.length > 0) {
+      console.log(`[get-chatwoot-messages] Primeira mensagem:`, JSON.stringify(messages[0], null, 2));
+    }
 
-    return data;
+    return messages;
   } catch (error) {
     console.error('[get-chatwoot-messages] === ERRO FATAL ===');
     console.error('[get-chatwoot-messages] Tipo de erro:', error instanceof Error ? error.constructor.name : typeof error);
