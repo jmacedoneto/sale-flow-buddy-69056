@@ -114,29 +114,30 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Validar credenciais do Chatwoot
-    const chatwootBaseUrl = Deno.env.get('CHATWOOT_BASE_URL');
-    const chatwootApiKey = Deno.env.get('CHATWOOT_API_KEY');
-    const chatwootAccountId = Deno.env.get('CHATWOOT_ACCOUNT_ID');
+    console.log('[get-chatwoot-messages] Iniciando busca de mensagens...');
 
-    console.log('[get-chatwoot-messages] Validando secrets...');
-    console.log('[get-chatwoot-messages] BASE_URL configurada:', chatwootBaseUrl ? 'SIM' : 'NÃO');
-    console.log('[get-chatwoot-messages] API_KEY configurada:', chatwootApiKey ? 'SIM (length: ' + chatwootApiKey.length + ')' : 'NÃO');
-    console.log('[get-chatwoot-messages] ACCOUNT_ID configurado:', chatwootAccountId ? chatwootAccountId : 'NÃO');
+    // Criar cliente Supabase
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
-    if (!chatwootBaseUrl || !chatwootApiKey || !chatwootAccountId) {
-      throw new Error('Credenciais do Chatwoot não configuradas. Verifique CHATWOOT_BASE_URL, CHATWOOT_API_KEY e CHATWOOT_ACCOUNT_ID');
+    // Buscar configuração do Chatwoot da tabela integracao_chatwoot
+    const { data: config, error: configError } = await supabase
+      .from('integracao_chatwoot')
+      .select('*')
+      .eq('status', 'ativo')
+      .maybeSingle();
+
+    if (configError || !config) {
+      console.error('[get-chatwoot-messages] Erro ao buscar config:', configError);
+      throw new Error('Chatwoot não configurado ou inativo');
     }
 
-    // Validar formato da BASE_URL (não deve ter barra final)
-    if (chatwootBaseUrl.endsWith('/')) {
-      throw new Error('CHATWOOT_BASE_URL não deve ter barra final. Remova a "/" no final da URL');
-    }
-
-    // Validar formato do ACCOUNT_ID (deve ser numérico)
-    if (!/^\d+$/.test(chatwootAccountId)) {
-      throw new Error('CHATWOOT_ACCOUNT_ID deve ser numérico. Valor atual: ' + chatwootAccountId);
-    }
+    console.log('[get-chatwoot-messages] Config encontrada:', {
+      url: config.url,
+      accountId: config.account_id,
+      hasApiKey: !!config.api_key,
+    });
 
     // Extrair conversationId do body da requisição
     const { conversationId } = await req.json();
@@ -152,13 +153,12 @@ Deno.serve(async (req) => {
     }
 
     console.log(`[get-chatwoot-messages] Buscando mensagens para conversa ${conversationId}`);
-    console.log('[get-chatwoot-messages] URL completa:', `${chatwootBaseUrl}/api/v1/accounts/${chatwootAccountId}/conversations/${conversationId}/messages`);
 
     // Buscar mensagens da conversa
     const messages = await fetchConversationMessages(
-      chatwootBaseUrl,
-      chatwootApiKey,
-      chatwootAccountId,
+      config.url,
+      config.api_key,
+      config.account_id.toString(),
       conversationId
     );
 
