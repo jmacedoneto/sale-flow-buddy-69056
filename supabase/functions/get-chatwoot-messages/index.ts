@@ -95,11 +95,13 @@ async function fetchConversationMessages(
     const data = await response.json();
     console.log(`[get-chatwoot-messages] === SUCESSO ===`);
     console.log(`[get-chatwoot-messages] Tipo de resposta:`, typeof data);
-    console.log(`[get-chatwoot-messages] É array?:`, Array.isArray(data));
-    console.log(`[get-chatwoot-messages] Payload completo (sample):`, JSON.stringify(data).substring(0, 500));
+    console.log(`[get-chatwoot-messages] Keys:`, Object.keys(data));
     
-    // A API do Chatwoot retorna um array diretamente
-    const messages: ChatwootMessage[] = Array.isArray(data) ? data : [];
+    // A API do Chatwoot retorna { meta: {...}, payload: [...] }
+    // As mensagens estão em data.payload
+    const messages: ChatwootMessage[] = Array.isArray(data.payload) ? data.payload : 
+                                        Array.isArray(data) ? data : [];
+    
     console.log(`[get-chatwoot-messages] ${messages.length} mensagens encontradas`);
     
     if (messages.length > 0) {
