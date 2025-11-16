@@ -42,29 +42,44 @@ export type Database = {
         Row: {
           card_id: string
           chatwoot_message_id: number | null
+          data_conclusao: string | null
           data_criacao: string
+          data_prevista: string | null
           descricao: string
           id: string
+          observacao: string | null
           privado: boolean | null
+          status: string | null
           tipo: string
+          user_id: string | null
         }
         Insert: {
           card_id: string
           chatwoot_message_id?: number | null
+          data_conclusao?: string | null
           data_criacao?: string
+          data_prevista?: string | null
           descricao: string
           id?: string
+          observacao?: string | null
           privado?: boolean | null
+          status?: string | null
           tipo: string
+          user_id?: string | null
         }
         Update: {
           card_id?: string
           chatwoot_message_id?: number | null
+          data_conclusao?: string | null
           data_criacao?: string
+          data_prevista?: string | null
           descricao?: string
           id?: string
+          observacao?: string | null
           privado?: boolean | null
+          status?: string | null
           tipo?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -604,6 +619,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      proximo_dia_util: { Args: { data_base?: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "manager" | "agent" | "viewer"
