@@ -41,12 +41,14 @@ export const useCreateAtividade = () => {
       cardId, 
       tipo, 
       descricao,
+      dataPrevista,
       sendToChatwoot = false,
       conversationId,
     }: { 
       cardId: string; 
       tipo: string; 
       descricao: string;
+      dataPrevista?: string;
       sendToChatwoot?: boolean;
       conversationId?: number;
     }) => {
@@ -57,6 +59,7 @@ export const useCreateAtividade = () => {
           card_id: cardId,
           tipo,
           descricao,
+          data_prevista: dataPrevista || null,
           privado: sendToChatwoot, // marcar como privada se vai para Chatwoot
         })
         .select()
