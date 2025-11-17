@@ -20,7 +20,10 @@ export const useChatwootMessages = (conversationId: number | null) => {
     refetchInterval: (query) => {
       return query.state.error ? false : 10000;
     },
-    refetchOnWindowFocus: true,
+    // Desabilita refetch ao focar na janela se houver erro
+    refetchOnWindowFocus: (query) => {
+      return !query.state.error;
+    },
     retry: false, // Não tenta novamente em caso de erro
   });
 };
