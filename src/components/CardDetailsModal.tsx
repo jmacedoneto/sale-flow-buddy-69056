@@ -150,6 +150,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
         cardId: card.id,
         tipo: followUpTipo,
         descricao: followUpDescricao,
+        dataPrevista: followUpData ? followUpData.toISOString() : undefined,
         sendToChatwoot: true,
         conversationId: card.chatwoot_conversa_id || undefined,
       });
