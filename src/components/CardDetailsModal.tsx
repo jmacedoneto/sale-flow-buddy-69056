@@ -96,17 +96,18 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
         onSuccess: async () => {
           toast.success("Card atualizado!");
           
-          // Sincronizar título com Chatwoot se houver conversation_id
-          if (card.chatwoot_conversa_id && titulo !== card.titulo) {
+          // Sincronizar com Chatwoot se houver conversation_id
+          if (card.chatwoot_conversa_id) {
             try {
               await supabase.functions.invoke('sync-card-to-chatwoot', {
                 body: { 
-                  conversationId: card.chatwoot_conversa_id,
-                  titulo 
+                  conversation_id: card.chatwoot_conversa_id,
+                  label: funilNome,
+                  etapa_comercial: funilEtapa,
                 }
               });
             } catch (error) {
-              console.error("Erro ao sincronizar título com Chatwoot:", error);
+              console.error("Erro ao sincronizar com Chatwoot:", error);
             }
           }
         },
