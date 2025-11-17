@@ -15,8 +15,12 @@ export const useChatwootMessages = (conversationId: number | null) => {
       return fetchChatwootMessages(conversationId);
     },
     enabled: !!conversationId,
-    staleTime: 5000, // 5 segundos - mais agressivo para refletir mudanças rapidamente
-    refetchInterval: 10000, // Polling a cada 10 segundos quando ativo
-    refetchOnWindowFocus: true, // Refetch ao voltar para a janela
+    staleTime: 5000,
+    // Só faz polling se não houver erro (evita repetir chamadas para conversas inexistentes)
+    refetchInterval: (query) => {
+      return query.state.error ? false : 10000;
+    },
+    refetchOnWindowFocus: true,
+    retry: false, // Não tenta novamente em caso de erro
   });
 };
