@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, MessageCircle, User } from "lucide-react";
+import { Send, Loader2, MessageCircle, User, Image as ImageIcon, FileText, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,7 +27,7 @@ export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) =
   const canSendMessages = funilId ? canEditFunil(funilId) : false;
 
   // Buscar mensagens com polling de 10 segundos
-  const { data: messages = [], isLoading, refetch } = useChatwootMessages(conversationId);
+  const { data: messages = [], isLoading, error, refetch } = useChatwootMessages(conversationId);
 
   // Auto-scroll para última mensagem
   useEffect(() => {
@@ -87,6 +87,25 @@ export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) =
     return (
       <div className="flex items-center justify-center h-full">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Exibir erro amigável se a conversa não existir
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full p-6 text-center">
+        <MessageCircle className="h-12 w-12 mb-4 text-muted-foreground opacity-50" />
+        <h3 className="font-semibold text-foreground mb-2">Conversa não encontrada</h3>
+        <p className="text-sm text-muted-foreground mb-4 max-w-md">
+          A conversa #{conversationId} não foi encontrada no Chatwoot. 
+          Ela pode ter sido deletada ou o ID pode estar incorreto.
+        </p>
+        <Alert variant="destructive" className="max-w-md">
+          <AlertDescription className="text-xs">
+            {error.message}
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
