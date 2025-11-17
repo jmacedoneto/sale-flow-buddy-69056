@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "./ui/table";
 import { AtividadeRetornoModal } from "./AtividadeRetornoModal";
+import { useNavigate } from "react-router-dom";
 
 interface Atividade {
   id: string;
@@ -40,6 +41,7 @@ interface AtividadesListProps {
 
 export const AtividadesList = ({ atividades, users, onRefresh }: AtividadesListProps) => {
   const [selectedAtividade, setSelectedAtividade] = useState<Atividade | null>(null);
+  const navigate = useNavigate();
 
   const getUserName = (userId?: string) => {
     if (!userId) return "Não atribuído";
@@ -56,6 +58,11 @@ export const AtividadesList = ({ atividades, users, onRefresh }: AtividadesListP
       default:
         return <Badge variant="outline"><Clock className="h-3 w-3 mr-1" />Pendente</Badge>;
     }
+  };
+
+  const handleCardClick = (cardId: string) => {
+    // Navegar para dashboard com modal do card aberto
+    navigate(`/?cardId=${cardId}`);
   };
 
   return (
@@ -82,7 +89,11 @@ export const AtividadesList = ({ atividades, users, onRefresh }: AtividadesListP
               </TableRow>
             ) : (
               atividades.map((atividade) => (
-                <TableRow key={atividade.id}>
+                <TableRow 
+                  key={atividade.id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() => handleCardClick(atividade.card_id)}
+                >
                   <TableCell className="font-medium">{atividade.descricao}</TableCell>
                   <TableCell>
                     <Badge variant="secondary">{atividade.tipo}</Badge>
@@ -101,7 +112,10 @@ export const AtividadesList = ({ atividades, users, onRefresh }: AtividadesListP
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => setSelectedAtividade(atividade)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedAtividade(atividade);
+                      }}
                       disabled={atividade.status === 'concluida'}
                     >
                       {atividade.status === 'concluida' ? 'Concluída' : 'Registrar Retorno'}

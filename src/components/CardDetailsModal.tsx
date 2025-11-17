@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info, Sparkles, Trophy, X, Pause } from "lucide-react";
+import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info, Sparkles, Trophy, X, Pause, ExternalLink } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -69,6 +69,11 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
       setDataRetorno(
         card.data_retorno ? new Date(card.data_retorno) : new Date(Date.now() + 7 * 86400000)
       );
+      
+      // Gerar resumo comercial automaticamente se não existir
+      if (!card.resumo_comercial && card.chatwoot_conversa_id) {
+        handleGerarResumo();
+      }
     }
   }, [card]);
 
