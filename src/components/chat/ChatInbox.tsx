@@ -48,22 +48,29 @@ export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) =
   const handleSend = async () => {
     if (!message.trim() || !canSendMessages) return;
 
+    const messageToSend = message;
+    setMessage("");
     setSending(true);
+
     try {
-      await sendChatwootMessage({
+      const result = await sendChatwootMessage({
         conversationId,
-        content: message.trim(),
+        content: messageToSend,
         private: false,
       });
 
-      setMessage("");
+      if (!result.success) {
+        throw new Error(result.error || "Erro ao enviar mensagem");
+      }
+
       toast.success("Mensagem enviada");
       
       // Refetch imediato após enviar
       setTimeout(() => refetch(), 1000);
     } catch (error) {
       console.error("Erro ao enviar mensagem:", error);
-      toast.error("Erro ao enviar mensagem");
+      toast.error(error instanceof Error ? error.message : "Erro ao enviar mensagem");
+      setMessage(messageToSend); // Restaurar mensagem em caso de erro
     } finally {
       setSending(false);
     }
