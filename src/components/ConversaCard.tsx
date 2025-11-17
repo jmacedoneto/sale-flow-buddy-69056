@@ -1,14 +1,13 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { MessageSquare, Clock } from "lucide-react";
-import { formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow, differenceInDays, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { StatusInfo } from "@/services/cardStatusService";
-import { FollowUpInline } from "./FollowUpInline";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ConversaCardProps {
   id: string;
@@ -33,7 +32,11 @@ export const ConversaCard = ({
   onAgendarClick,
   onFollowUpCreated,
 }: ConversaCardProps) => {
-  const [showFollowUp, setShowFollowUp] = useState(false);
+  const [atividadeStatus, setAtividadeStatus] = useState<{
+    vencida: boolean;
+    diasRestantes: number;
+    dataRetorno: Date | null;
+  } | null>(null);
   
   const {
     attributes,
@@ -50,6 +53,35 @@ export const ConversaCard = ({
     opacity: isDragging ? 0.5 : 1,
   };
 
+  // Buscar atividade pendente mais próxima
+  useEffect(() => {
+    const fetchAtividade = async () => {
+      const { data } = await supabase
+        .from('atividades_cards')
+        .select('data_prevista, status')
+        .eq('card_id', id)
+        .eq('status', 'pendente')
+        .order('data_prevista', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (data && data.data_prevista) {
+        const dataRetorno = new Date(data.data_prevista);
+        const hoje = new Date();
+        hoje.setHours(0, 0, 0, 0);
+        
+        const vencida = isPast(dataRetorno) && !isToday(dataRetorno);
+        const diasRestantes = differenceInDays(dataRetorno, hoje);
+        
+        setAtividadeStatus({ vencida, diasRestantes, dataRetorno });
+      } else {
+        setAtividadeStatus(null);
+      }
+    };
+
+    fetchAtividade();
+  }, [id]);
+
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onClick?.();
@@ -58,6 +90,45 @@ export const ConversaCard = ({
   const handleAgendarClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onAgendarClick?.();
+  };
+
+  const renderAtividadeBadge = () => {
+    if (!atividadeStatus) return null;
+
+    const { vencida, diasRestantes } = atividadeStatus;
+
+    if (vencida) {
+      return (
+        <div className="flex items-center gap-1">
+          <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+          <span className="text-xs text-red-600 font-medium">
+            {Math.abs(diasRestantes)} {Math.abs(diasRestantes) === 1 ? 'dia vencido' : 'dias vencidos'}
+          </span>
+        </div>
+      );
+    }
+
+    if (diasRestantes === 0) {
+      return (
+        <div className="flex items-center gap-1">
+          <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
+          <span className="text-xs text-yellow-600 font-medium">Hoje</span>
+        </div>
+      );
+    }
+
+    if (diasRestantes > 0 && diasRestantes <= 3) {
+      return (
+        <div className="flex items-center gap-1">
+          <div className="h-2 w-2 rounded-full bg-green-500" />
+          <span className="text-xs text-green-600 font-medium">
+            {diasRestantes} {diasRestantes === 1 ? 'dia' : 'dias'}
+          </span>
+        </div>
+      );
+    }
+
+    return null;
   };
 
   const renderStatusBadge = () => {
@@ -69,14 +140,6 @@ export const ConversaCard = ({
           <Badge variant={variant} className="text-xs flex items-center gap-1">
             {label}
           </Badge>
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="h-6 text-xs" 
-            onClick={handleAgendarClick}
-          >
-            Agendar
-          </Button>
         </div>
       );
     }
@@ -133,31 +196,10 @@ export const ConversaCard = ({
           </div>
         </div>
 
+        {/* Indicador de atividade */}
+        {renderAtividadeBadge()}
+
         {renderStatusBadge()}
-        
-        <div className="pt-2">
-          {showFollowUp ? (
-            <FollowUpInline 
-              cardId={id} 
-              onSuccess={() => {
-                setShowFollowUp(false);
-                onFollowUpCreated?.();
-              }}
-            />
-          ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowFollowUp(true);
-              }}
-              className="w-full text-xs"
-            >
-              + Criar Follow-up
-            </Button>
-          )}
-        </div>
       </div>
     </Card>
   );
