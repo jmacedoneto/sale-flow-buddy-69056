@@ -140,6 +140,8 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   };
 
   const handleCriarFollowUp = async () => {
+    console.log('followUpData:', followUpData, 'followUpDescricao:', followUpDescricao);
+    
     if (!card || !followUpDescricao.trim()) {
       toast.error("Descrição do follow-up é obrigatória");
       return;
@@ -163,7 +165,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
       toast.success("Follow-up criado e enviado ao Chatwoot!");
     } catch (error) {
       console.error("Erro ao criar follow-up:", error);
-      toast.error("Erro ao criar follow-up");
+      toast.error(error instanceof Error ? error.message : "Erro ao criar follow-up");
     }
   };
 
