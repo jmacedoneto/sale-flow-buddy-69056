@@ -194,18 +194,73 @@ const MessageBubble = ({ message }: { message: ChatwootMessage }) => {
 
         {/* Anexos */}
         {message.attachments && message.attachments.length > 0 && (
-          <div className="mt-2 space-y-1">
-            {message.attachments.map((attachment: any, idx: number) => (
-              <a
-                key={idx}
-                href={attachment.data_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-primary hover:underline inline-flex items-center gap-1"
-              >
-                📎 {attachment.file_name || "Anexo"}
-              </a>
-            ))}
+          <div className="mt-2 space-y-2">
+            {message.attachments.map((attachment: any, idx: number) => {
+              const fileType = attachment.file_type || '';
+              const isImage = fileType.startsWith('image/');
+              const isAudio = fileType.startsWith('audio/');
+              const isVideo = fileType.startsWith('video/');
+
+              if (isImage) {
+                return (
+                  <a
+                    key={idx}
+                    href={attachment.data_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block"
+                  >
+                    <img
+                      src={attachment.data_url}
+                      alt={attachment.file_name || "Imagem"}
+                      className="max-w-xs rounded-lg shadow-sm hover:opacity-90 transition-opacity"
+                      loading="lazy"
+                    />
+                  </a>
+                );
+              }
+
+              if (isAudio) {
+                return (
+                  <audio
+                    key={idx}
+                    controls
+                    className="max-w-xs"
+                    preload="metadata"
+                  >
+                    <source src={attachment.data_url} type={fileType} />
+                    Seu navegador não suporta áudio.
+                  </audio>
+                );
+              }
+
+              if (isVideo) {
+                return (
+                  <video
+                    key={idx}
+                    controls
+                    className="max-w-xs rounded-lg shadow-sm"
+                    preload="metadata"
+                  >
+                    <source src={attachment.data_url} type={fileType} />
+                    Seu navegador não suporta vídeo.
+                  </video>
+                );
+              }
+
+              // Outros tipos de arquivo (PDF, documentos, etc.)
+              return (
+                <a
+                  key={idx}
+                  href={attachment.data_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                >
+                  📎 {attachment.file_name || "Anexo"}
+                </a>
+              );
+            })}
           </div>
         )}
       </div>
