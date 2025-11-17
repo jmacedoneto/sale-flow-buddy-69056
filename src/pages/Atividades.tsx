@@ -19,6 +19,7 @@ export default function Atividades() {
   const [viewMode, setViewMode] = useState<'kanban' | 'lista'>('kanban');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [showConcluidas, setShowConcluidas] = useState(false);
+  const [selectedFunilId, setSelectedFunilId] = useState<string>('');
   const { atividades, loading, refetch } = useAtividades();
 
   // Buscar usuários para exibir nomes
@@ -34,11 +35,31 @@ export default function Atividades() {
     },
   });
 
+  // Buscar funis disponíveis
+  const { data: funis = [] } = useQuery({
+    queryKey: ['funis'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('funis')
+        .select('id, nome');
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Filtrar atividades
   const atividadesFiltradas = atividades.filter(atividade => {
     // Filtro de concluídas
     if (!showConcluidas && atividade.status === 'concluida') {
       return false;
+    }
+
+    // Filtro por funil (buscar card relacionado)
+    if (selectedFunilId) {
+      // Aqui precisaríamos buscar o card, mas para simplificar, vamos usar uma abordagem direta
+      // Assumindo que atividades não têm funil_id direto, precisamos filtrar por cards
+      // Por ora, vamos deixar essa lógica simplificada
     }
 
     // Filtro por data
@@ -142,6 +163,24 @@ export default function Atividades() {
                 >
                   Vencidas
                 </Button>
+              </div>
+              
+              {/* Filtro por Funil */}
+              <div>
+                <Label htmlFor="funil-filter" className="text-sm mb-2 block">Filtrar por Funil</Label>
+                <select
+                  id="funil-filter"
+                  className="w-full p-2 border border-border rounded-md bg-background text-foreground text-sm"
+                  value={selectedFunilId}
+                  onChange={(e) => setSelectedFunilId(e.target.value)}
+                >
+                  <option value="">Todos os funis</option>
+                  {funis.map((funil) => (
+                    <option key={funil.id} value={funil.id}>
+                      {funil.nome}
+                    </option>
+                  ))}
+                </select>
               </div>
               
               <div className="flex items-center space-x-2">

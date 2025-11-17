@@ -484,15 +484,6 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                     </Select>
                   </div>
 
-                  <div>
-                    <Label>Descrição Detalhada</Label>
-                    <Textarea
-                      value={descricaoDetalhada}
-                      onChange={(e) => setDescricaoDetalhada(e.target.value)}
-                      placeholder="Detalhes adicionais sobre o card..."
-                      rows={4}
-                    />
-                  </div>
 
                   {/* Link para Chatwoot */}
                   {chatwootUrl && (
