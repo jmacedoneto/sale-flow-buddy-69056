@@ -36,14 +36,16 @@ export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) =
     }
   }, [messages]);
 
-  // Polling quando o componente está montado
+  // Polling quando o componente está montado - somente se não houver erro
   useEffect(() => {
+    if (error) return; // Não faz polling se houver erro
+    
     const interval = setInterval(() => {
       refetch();
     }, 10000); // 10 segundos
 
     return () => clearInterval(interval);
-  }, [refetch]);
+  }, [refetch, error]);
 
   const handleSend = async () => {
     if (!message.trim() || !canSendMessages) return;
