@@ -3,6 +3,7 @@ import { ArrowRight, BarChart3, MessageSquare, Zap, LogOut } from "lucide-react"
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
+import { DashboardHome } from "@/components/DashboardHome";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -66,6 +67,9 @@ const Index = () => {
           </Link>
         </div>
       </div>
+
+      {/* Dashboard Home - Social Feed */}
+      <DashboardHome />
 
       {/* Features */}
       <div className="grid md:grid-cols-3 gap-8 mt-20 max-w-5xl mx-auto">

@@ -173,6 +173,7 @@ export type Database = {
       }
       cards_conversas: {
         Row: {
+          arquivado: boolean | null
           assigned_to: string | null
           chatwoot_conversa_id: number | null
           created_at: string
@@ -196,6 +197,7 @@ export type Database = {
           valor_total: number | null
         }
         Insert: {
+          arquivado?: boolean | null
           assigned_to?: string | null
           chatwoot_conversa_id?: number | null
           created_at?: string
@@ -219,6 +221,7 @@ export type Database = {
           valor_total?: number | null
         }
         Update: {
+          arquivado?: boolean | null
           assigned_to?: string | null
           chatwoot_conversa_id?: number | null
           created_at?: string
@@ -268,6 +271,90 @@ export type Database = {
             columns: ["motivo_perda_id"]
             isOneToOne: false
             referencedRelation: "motivos_perda"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards_ganhos: {
+        Row: {
+          card_id: string | null
+          created_at: string | null
+          data_status: string | null
+          funil_id: string | null
+          id: string
+          motivo: string | null
+        }
+        Insert: {
+          card_id?: string | null
+          created_at?: string | null
+          data_status?: string | null
+          funil_id?: string | null
+          id?: string
+          motivo?: string | null
+        }
+        Update: {
+          card_id?: string | null
+          created_at?: string | null
+          data_status?: string | null
+          funil_id?: string | null
+          id?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_ganhos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_ganhos_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cards_perdidos: {
+        Row: {
+          card_id: string | null
+          created_at: string | null
+          data_status: string | null
+          funil_id: string | null
+          id: string
+          motivo: string | null
+        }
+        Insert: {
+          card_id?: string | null
+          created_at?: string | null
+          data_status?: string | null
+          funil_id?: string | null
+          id?: string
+          motivo?: string | null
+        }
+        Update: {
+          card_id?: string | null
+          created_at?: string | null
+          data_status?: string | null
+          funil_id?: string | null
+          id?: string
+          motivo?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cards_perdidos_card_id_fkey"
+            columns: ["card_id"]
+            isOneToOne: false
+            referencedRelation: "cards_conversas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_perdidos_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
             referencedColumns: ["id"]
           },
         ]
@@ -364,6 +451,33 @@ export type Database = {
           status?: string
           updated_at?: string
           url?: string
+        }
+        Relationships: []
+      }
+      kanban_colors: {
+        Row: {
+          coluna: string
+          cor: string
+          created_at: string | null
+          id: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          coluna: string
+          cor: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          coluna?: string
+          cor?: string
+          created_at?: string | null
+          id?: string
+          updated_at?: string | null
+          user_id?: string | null
         }
         Relationships: []
       }

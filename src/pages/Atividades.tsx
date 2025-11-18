@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAtividades } from "@/hooks/useAtividades";
 import { AtividadeTimeline } from "@/components/AtividadeTimeline";
 import { AtividadesList } from "@/components/AtividadesList";
+import { AtividadesKanban } from "@/components/AtividadesKanban";
 import { Button } from "@/components/ui/button";
 import { LayoutList, LayoutGrid, Home, BarChart3, Filter } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -12,6 +13,7 @@ import { Link } from "react-router-dom";
 import { isToday, isTomorrow, isThisWeek, isPast } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type FilterType = 'all' | 'hoje' | 'amanha' | 'semana' | 'vencidas';
 
@@ -19,9 +21,14 @@ export default function Atividades() {
   const [viewMode, setViewMode] = useState<'kanban' | 'lista'>('kanban');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [showConcluidas, setShowConcluidas] = useState(false);
+  const [filters, setFilters] = useState({
+    produto: null as string | null,
+    funil: null as string | null,
+    usuario: null as string | null,
+  });
   const { atividades, loading, refetch } = useAtividades();
 
-  // Buscar usuários para exibir nomes
+  // Buscar usuários, produtos e funis para os filtros
   const { data: users = [] } = useQuery({
     queryKey: ['users-crm'],
     queryFn: async () => {
@@ -29,6 +36,24 @@ export default function Atividades() {
         .from('users_crm')
         .select('id, nome, email');
       
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: produtos = [] } = useQuery({
+    queryKey: ['produtos'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('produtos').select('*').eq('ativo', true);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: funis = [] } = useQuery({
+    queryKey: ['funis'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('funis').select('*');
       if (error) throw error;
       return data;
     },
