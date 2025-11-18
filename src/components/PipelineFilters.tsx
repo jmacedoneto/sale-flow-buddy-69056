@@ -105,14 +105,14 @@ export const PipelineFilters = ({ filters, setFilters, onClear }: PipelineFilter
           <div>
             <label className="text-sm font-medium mb-2 block">Funil</label>
             <Select
-              value={filters.funilId || ''}
-              onValueChange={(value) => setFilters({ ...filters, funilId: value || null })}
+              value={filters.funilId || 'todos'}
+              onValueChange={(value) => setFilters({ ...filters, funilId: value === 'todos' ? null : value })}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Todos os funis" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os funis</SelectItem>
+                <SelectItem value="todos">Todos os funis</SelectItem>
                 {funis.map((funil) => (
                   <SelectItem key={funil.id} value={funil.id}>
                     {funil.nome}
@@ -128,14 +128,14 @@ export const PipelineFilters = ({ filters, setFilters, onClear }: PipelineFilter
               <div>
                 <label className="text-sm font-medium mb-2 block">Produto</label>
                 <Select
-                  value={filters.productId || ''}
-                  onValueChange={(value) => setFilters({ ...filters, productId: value || null })}
+                  value={filters.productId || 'todos'}
+                  onValueChange={(value) => setFilters({ ...filters, productId: value === 'todos' ? null : value })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Todos os produtos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos os produtos</SelectItem>
+                    <SelectItem value="todos">Todos os produtos</SelectItem>
                     {produtos.map((produto) => (
                       <SelectItem key={produto.id} value={produto.id}>
                         {produto.nome}
