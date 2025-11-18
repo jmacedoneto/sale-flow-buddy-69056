@@ -14,6 +14,7 @@ import DashboardComercial from "./pages/DashboardComercial";
 import DashboardAdministrativo from "./pages/DashboardAdministrativo";
 import Atividades from "./pages/Atividades";
 import Configuracoes from "./pages/Configuracoes";
+import ConfiguracoesUsers from "./pages/ConfiguracoesUsers";
 import UsuariosPermissoes from "./pages/UsuariosPermissoes";
 import NegociacoesPausadas from "./pages/NegociacoesPausadas";
 import NotFound from "./pages/NotFound";
@@ -36,6 +37,7 @@ const AppContent = () => {
         <Route path="/dashboard-administrativo" element={<ProtectedRoute><DashboardAdministrativo /></ProtectedRoute>} />
         <Route path="/atividades" element={<ProtectedRoute><Atividades /></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+        <Route path="/configuracoes-users" element={<ProtectedRoute><ConfiguracoesUsers /></ProtectedRoute>} />
         <Route path="/usuarios-permissoes" element={<ProtectedRoute><UsuariosPermissoes /></ProtectedRoute>} />
         <Route path="/negociacoes-pausadas" element={<ProtectedRoute><NegociacoesPausadas /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
