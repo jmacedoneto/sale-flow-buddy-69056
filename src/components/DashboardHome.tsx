@@ -78,10 +78,50 @@ export const DashboardHome = () => {
         .gte('data_prevista', hoje)
         .lte('data_prevista', `${hoje}T23:59:59`)
         .order('data_prevista', { ascending: true })
-        .limit(10);
+        .limit(5);
 
       if (error) throw error;
       return data || [];
+    },
+    enabled: !!user?.id,
+  });
+
+  const { data: taskStats } = useQuery({
+    queryKey: ['task-stats', user?.id],
+    queryFn: async () => {
+      if (!user?.id) return { hoje: 0, vencidas: 0, comFollowUp: 0 };
+
+      const hoje = new Date().toISOString().split('T')[0];
+      const ontem = new Date();
+      ontem.setDate(ontem.getDate() - 1);
+
+      const [hojeResult, vencidasResult, followUpResult] = await Promise.all([
+        supabase
+          .from('atividades_cards')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'pendente')
+          .gte('data_prevista', hoje)
+          .lte('data_prevista', `${hoje}T23:59:59`),
+        supabase
+          .from('atividades_cards')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'pendente')
+          .lt('data_prevista', hoje),
+        supabase
+          .from('cards_conversas')
+          .select('*', { count: 'exact', head: true })
+          .eq('assigned_to', user.id)
+          .not('data_retorno', 'is', null)
+          .eq('status', 'em_andamento'),
+      ]);
+
+      return {
+        hoje: hojeResult.count || 0,
+        vencidas: vencidasResult.count || 0,
+        comFollowUp: followUpResult.count || 0,
+      };
     },
     enabled: !!user?.id,
   });
@@ -112,12 +152,54 @@ export const DashboardHome = () => {
         <MetricCard label="Vendas Ativas" value={metrics?.active_sales || 0} icon={DollarSign} />
       </div>
 
+      {/* Resumo de Atividades */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Atividades Hoje</p>
+                <p className="text-3xl font-bold text-primary">{taskStats?.hoje || 0}</p>
+              </div>
+              <Clock className="h-8 w-8 text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Vencidas</p>
+                <p className="text-3xl font-bold text-red-600">{taskStats?.vencidas || 0}</p>
+              </div>
+              <Clock className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Com Follow-up</p>
+                <p className="text-3xl font-bold text-green-600">{taskStats?.comFollowUp || 0}</p>
+              </div>
+              <Clock className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Social Feed - Tarefas do Dia */}
       <Card>
         <CardContent className="p-6">
-          <h2 className="text-xl font-semibold mb-4">
-            Seu dia ({format(new Date(), "dd 'de' MMMM", { locale: ptBR })})
-          </h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">
+              Próximas Atividades ({format(new Date(), "dd 'de' MMMM", { locale: ptBR })})
+            </h2>
+            <Button variant="outline" size="sm" asChild>
+              <a href="/atividades">Ver Todas</a>
+            </Button>
+          </div>
 
           <div className="space-y-3">
             {userTasks.length === 0 ? (
