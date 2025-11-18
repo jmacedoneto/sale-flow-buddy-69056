@@ -53,6 +53,8 @@ export const useCreateAtividade = () => {
       conversationId?: number;
     }) => {
       // 1. Criar atividade no CRM
+      const { data: { user } } = await supabase.auth.getUser();
+      
       const { data, error } = await (supabase as any)
         .from("atividades_cards")
         .insert({
@@ -61,6 +63,7 @@ export const useCreateAtividade = () => {
           descricao,
           data_prevista: dataPrevista || null,
           privado: sendToChatwoot, // marcar como privada se vai para Chatwoot
+          user_id: user?.id || null, // ✅ Adicionar user_id para RLS
         })
         .select()
         .single();
