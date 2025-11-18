@@ -120,52 +120,106 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   };
 
   const handleAdicionarNota = async () => {
-    if (!card || !novaNota.trim()) return;
+    if (!card || !novaNota.trim()) {
+      toast.error("Nota vazia");
+      return;
+    }
+
+    // Validar conversa Chatwoot
+    if (!card.chatwoot_conversa_id) {
+      console.warn('⚠️ Card sem conversa Chatwoot vinculada');
+      toast.error("Este card não possui conversa do Chatwoot. Nota será criada apenas no CRM.");
+    }
 
     try {
+      console.log('🔍 [DEBUG] Adicionando nota:', {
+        cardId: card.id,
+        conversationId: card.chatwoot_conversa_id,
+        notaLength: novaNota.length
+      });
+
       await createAtividade.mutateAsync({
         cardId: card.id,
         tipo: "Nota",
         descricao: novaNota,
-        sendToChatwoot: true,
+        sendToChatwoot: !!card.chatwoot_conversa_id,
         conversationId: card.chatwoot_conversa_id || undefined,
       });
 
+      console.log('✅ [SUCCESS] Nota adicionada');
       setNovaNota("");
-      toast.success("Nota adicionada e enviada ao Chatwoot!");
+      
+      toast.success(
+        card.chatwoot_conversa_id
+          ? "Nota adicionada e enviada ao Chatwoot!"
+          : "Nota adicionada no CRM!"
+      );
     } catch (error) {
-      console.error("Erro ao adicionar nota:", error);
-      toast.error("Erro ao adicionar nota");
+      console.error("❌ [ERROR] Erro ao adicionar nota:", error);
+      console.error("  - Tipo:", error?.constructor?.name);
+      console.error("  - Mensagem:", error?.message);
+      
+      toast.error(
+        error instanceof Error 
+          ? `Erro: ${error.message}` 
+          : "Erro ao adicionar nota"
+      );
     }
   };
 
   const handleCriarFollowUp = async () => {
-    console.log('followUpData:', followUpData, 'followUpDescricao:', followUpDescricao);
+    console.log('🔍 [DEBUG] Follow-up iniciado:', {
+      cardId: card?.id,
+      conversationId: card?.chatwoot_conversa_id,
+      followUpData,
+      followUpDescricao: followUpDescricao?.substring(0, 30)
+    });
     
     if (!card || !followUpDescricao.trim()) {
       toast.error("Descrição do follow-up é obrigatória");
       return;
     }
 
+    // Validação crítica: verificar se conversa existe
+    if (!card.chatwoot_conversa_id) {
+      console.warn('⚠️ Card sem conversa Chatwoot vinculada');
+      toast.error("Este card não possui conversa do Chatwoot vinculada. Follow-up será criado apenas no CRM.");
+    }
+
     try {
+      console.log('🔍 [DEBUG] Chamando createAtividade.mutateAsync...');
+      
       await createAtividade.mutateAsync({
         cardId: card.id,
         tipo: followUpTipo,
         descricao: followUpDescricao,
         dataPrevista: followUpData ? followUpData.toISOString() : undefined,
-        sendToChatwoot: true,
+        sendToChatwoot: !!card.chatwoot_conversa_id,
         conversationId: card.chatwoot_conversa_id || undefined,
       });
+
+      console.log('✅ [SUCCESS] Follow-up criado com sucesso');
 
       // Limpar formulário
       setFollowUpDescricao("");
       setFollowUpTipo("Ligação");
       setFollowUpData(new Date(Date.now() + 7 * 86400000));
       
-      toast.success("Follow-up criado e enviado ao Chatwoot!");
+      toast.success(
+        card.chatwoot_conversa_id 
+          ? "Follow-up criado e enviado ao Chatwoot!" 
+          : "Follow-up criado no CRM!"
+      );
     } catch (error) {
-      console.error("Erro ao criar follow-up:", error);
-      toast.error(error instanceof Error ? error.message : "Erro ao criar follow-up");
+      console.error("❌ [ERROR] Erro ao criar follow-up:", error);
+      console.error("  - Tipo:", error?.constructor?.name);
+      console.error("  - Mensagem:", error?.message);
+      
+      toast.error(
+        error instanceof Error 
+          ? `Erro: ${error.message}` 
+          : "Erro ao criar follow-up"
+      );
     }
   };
 
