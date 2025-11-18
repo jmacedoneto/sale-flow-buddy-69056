@@ -1,44 +1,25 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useAtividades } from "@/hooks/useAtividades";
-import { AtividadeTimeline } from "@/components/AtividadeTimeline";
-import { AtividadesList } from "@/components/AtividadesList";
 import { AtividadesKanban } from "@/components/AtividadesKanban";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LayoutList, LayoutGrid, Home, BarChart3, Filter } from "lucide-react";
+import { ArrowLeft, Search } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { isToday, isTomorrow, isThisWeek, isPast } from "date-fns";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type FilterType = 'all' | 'hoje' | 'amanha' | 'semana' | 'vencidas';
+type PrioridadeFilter = 'todas' | 'baixa' | 'media' | 'alta' | 'urgente';
+type PeriodoFilter = 'todos' | 'hoje' | 'esta_semana' | 'este_mes';
 
 export default function Atividades() {
-  const [viewMode, setViewMode] = useState<'kanban' | 'lista'>('kanban');
-  const [filterType, setFilterType] = useState<FilterType>('all');
-  const [showConcluidas, setShowConcluidas] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [prioridade, setPrioridade] = useState<PrioridadeFilter>('todas');
+  const [periodo, setPeriodo] = useState<PeriodoFilter>('todos');
   const [filters, setFilters] = useState({
     produto: null as string | null,
     funil: null as string | null,
     usuario: null as string | null,
-  });
-  const { atividades, loading, refetch } = useAtividades();
-
-  // Buscar usuários, produtos e funis para os filtros
-  const { data: users = [] } = useQuery({
-    queryKey: ['users-crm'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('users_crm')
-        .select('id, nome, email');
-      
-      if (error) throw error;
-      return data;
-    },
   });
 
   const { data: produtos = [] } = useQuery({
@@ -60,147 +41,111 @@ export default function Atividades() {
   });
 
 
-  // Filtrar atividades
-  const atividadesFiltradas = atividades.filter(atividade => {
-    // Filtro de concluídas
-    if (!showConcluidas && atividade.status === 'concluida') {
-      return false;
-    }
-
-
-    // Filtro por data
-    if (filterType === 'all') return true;
-    
-    if (!atividade.data_prevista) return false;
-    
-    const dataPrevista = new Date(atividade.data_prevista);
-    
-    switch (filterType) {
-      case 'hoje':
-        return isToday(dataPrevista);
-      case 'amanha':
-        return isTomorrow(dataPrevista);
-      case 'semana':
-        return isThisWeek(dataPrevista);
-      case 'vencidas':
-        return isPast(dataPrevista) && !isToday(dataPrevista) && atividade.status === 'pendente';
-      default:
-        return true;
-    }
-  });
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+    <div className="min-h-screen bg-background">
       <Header />
-      <div className="container mx-auto p-8">
-        <Card className="shadow-xl">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-7">
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Atividades
-            </CardTitle>
-            <div className="flex gap-2">
-              <Link to="/">
-                <Button variant="outline" size="sm">
-                  <Home className="h-4 w-4 mr-2" />
-                  Dashboard
-                </Button>
-              </Link>
-              <Link to="/dashboard-comercial">
-                <Button variant="outline" size="sm">
-                  <BarChart3 className="h-4 w-4 mr-2" />
-                  Comercial
-                </Button>
-              </Link>
-              <Button
-                variant={viewMode === 'kanban' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('kanban')}
-              >
-                <LayoutGrid className="h-4 w-4 mr-2" />
-                Kanban
+      <div className="container mx-auto px-4 py-6">
+        <div className="mb-6">
+          <div className="flex items-center gap-4 mb-4">
+            <Link to="/">
+              <Button variant="ghost" size="sm">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Voltar
               </Button>
-              <Button
-                variant={viewMode === 'lista' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setViewMode('lista')}
-              >
-                <LayoutList className="h-4 w-4 mr-2" />
-                Lista
-              </Button>
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold">Painel de Atividades</h1>
+              <p className="text-sm text-muted-foreground">Acompanhe cards com prazos definidos</p>
             </div>
-          </CardHeader>
-          <CardContent>
-            {/* Filtros */}
-            <div className="mb-6 space-y-4">
-              <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant={filterType === 'all' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterType('all')}
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Todas
-                </Button>
-                <Button
-                  variant={filterType === 'hoje' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterType('hoje')}
-                >
-                  Hoje
-                </Button>
-                <Button
-                  variant={filterType === 'amanha' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterType('amanha')}
-                >
-                  Amanhã
-                </Button>
-                <Button
-                  variant={filterType === 'semana' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterType('semana')}
-                >
-                  Esta Semana
-                </Button>
-                <Button
-                  variant={filterType === 'vencidas' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setFilterType('vencidas')}
-                >
-                  Vencidas
-                </Button>
-              </div>
-              
-              <div className="flex items-center space-x-2">
-                <Checkbox 
-                  id="concluidas" 
-                  checked={showConcluidas}
-                  onCheckedChange={(checked) => setShowConcluidas(checked as boolean)}
-                />
-                <Label htmlFor="concluidas" className="text-sm cursor-pointer">
-                  Mostrar atividades concluídas
-                </Label>
+          </div>
+
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por título ou resumo..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Prioridade:</span>
+              <div className="flex gap-1">
+                {(['todas', 'baixa', 'media', 'alta', 'urgente'] as PrioridadeFilter[]).map((p) => (
+                  <Button
+                    key={p}
+                    variant={prioridade === p ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPrioridade(p)}
+                  >
+                    {p === 'todas' ? 'Todas' : p.charAt(0).toUpperCase() + p.slice(1)}
+                  </Button>
+                ))}
               </div>
             </div>
 
-            {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground">Carregando atividades...</p>
-                </div>
+            <div className="flex items-center gap-2 ml-4">
+              <span className="text-sm font-medium">Período:</span>
+              <div className="flex gap-1">
+                {(['todos', 'hoje', 'esta_semana', 'este_mes'] as PeriodoFilter[]).map((per) => (
+                  <Button
+                    key={per}
+                    variant={periodo === per ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setPeriodo(per)}
+                  >
+                    {per === 'todos' ? 'Todos' : per === 'hoje' ? 'Hoje' : per === 'esta_semana' ? 'Esta Semana' : 'Este Mês'}
+                  </Button>
+                ))}
               </div>
-            ) : viewMode === 'kanban' ? (
-              <AtividadeTimeline atividades={atividadesFiltradas} />
-            ) : (
-              <AtividadesList 
-                atividades={atividadesFiltradas} 
-                users={users}
-                onRefresh={refetch}
-              />
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+
+          <div className="flex gap-2">
+            <Select
+              value={filters.funil || 'todos'}
+              onValueChange={(value) => setFilters({ ...filters, funil: value === 'todos' ? null : value })}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Todos os funis" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os funis</SelectItem>
+                {funis.map((funil) => (
+                  <SelectItem key={funil.id} value={funil.id}>
+                    {funil.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={filters.produto || 'todos'}
+              onValueChange={(value) => setFilters({ ...filters, produto: value === 'todos' ? null : value })}
+            >
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Todos os produtos" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todos">Todos os produtos</SelectItem>
+                {produtos.map((produto) => (
+                  <SelectItem key={produto.id} value={produto.id}>
+                    {produto.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <AtividadesKanban 
+          filters={filters} 
+          searchTerm={searchTerm}
+          prioridade={prioridade}
+          periodo={periodo}
+        />
       </div>
     </div>
   );
