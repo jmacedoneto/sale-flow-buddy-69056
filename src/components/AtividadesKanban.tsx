@@ -15,6 +15,9 @@ interface AtividadesKanbanProps {
     funil: string | null;
     usuario: string | null;
   };
+  searchTerm: string;
+  prioridade: 'todas' | 'baixa' | 'media' | 'alta' | 'urgente';
+  periodo: 'todos' | 'hoje' | 'esta_semana' | 'este_mes';
 }
 
 const getActivityIcon = (tipo: string) => {
@@ -28,7 +31,7 @@ const getActivityIcon = (tipo: string) => {
   }
 };
 
-export const AtividadesKanban = ({ filters }: AtividadesKanbanProps) => {
+export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: AtividadesKanbanProps) => {
   const { colors } = useKanbanColors();
   const [selectedAtividade, setSelectedAtividade] = useState<any | null>(null);
   const { data: atividades = [], isLoading } = useQuery({
