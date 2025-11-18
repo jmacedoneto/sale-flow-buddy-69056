@@ -8,6 +8,7 @@ import { AbaMonitoramento } from "@/components/AbaMonitoramento";
 import { AbaConfigIA } from "@/components/AbaConfigIA";
 import { AbaProdutos } from "@/components/AbaProdutos";
 import { AbaMotivosPerda } from "@/components/AbaMotivosPerda";
+import { AbaKanbanColors } from "@/components/AbaKanbanColors";
 
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -40,7 +41,7 @@ const Configuracoes = () => {
         <h1 className="text-4xl font-bold mb-8">⚙️ Configurações</h1>
         
         <Tabs defaultValue="chatwoot" className="w-full">
-          <TabsList className={`grid w-full ${isMaster ? 'grid-cols-9' : 'grid-cols-8'}`}>
+          <TabsList className={`grid w-full ${isMaster ? 'grid-cols-10' : 'grid-cols-9'}`}>
             <TabsTrigger value="chatwoot">Chatwoot</TabsTrigger>
             <TabsTrigger value="webhooks">Webhooks Internos</TabsTrigger>
             <TabsTrigger value="externos">Webhooks Externos</TabsTrigger>
@@ -49,6 +50,7 @@ const Configuracoes = () => {
             <TabsTrigger value="ia">IA</TabsTrigger>
             <TabsTrigger value="produtos">Produtos</TabsTrigger>
             <TabsTrigger value="motivos-perda">Motivos de Perda</TabsTrigger>
+            <TabsTrigger value="kanban-colors">Cores Kanban</TabsTrigger>
             {isMaster && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
           </TabsList>
 
@@ -82,6 +84,10 @@ const Configuracoes = () => {
 
           <TabsContent value="motivos-perda" className="mt-6">
             <AbaMotivosPerda />
+          </TabsContent>
+
+          <TabsContent value="kanban-colors" className="mt-6">
+            <AbaKanbanColors />
           </TabsContent>
 
           {isMaster && (

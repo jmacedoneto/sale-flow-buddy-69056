@@ -8,6 +8,10 @@ import { CSS } from "@dnd-kit/utilities";
 import type { StatusInfo } from "@/services/cardStatusService";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
+import { CheckCircle2, XCircle, Pause } from "lucide-react";
+import { CardStatusModal } from "./CardStatusModal";
+import { useCardStatus, type CardStatus } from "@/hooks/useCardStatus";
 
 interface ConversaCardProps {
   id: string;
@@ -16,6 +20,7 @@ interface ConversaCardProps {
   chatwootConversaId?: number | null;
   createdAt: string;
   statusInfo: StatusInfo;
+  funilId?: string;
   onClick?: () => void;
   onAgendarClick?: () => void;
   onFollowUpCreated?: () => void;
@@ -28,6 +33,7 @@ export const ConversaCard = ({
   chatwootConversaId,
   createdAt,
   statusInfo,
+  funilId,
   onClick,
   onAgendarClick,
   onFollowUpCreated,
@@ -37,6 +43,8 @@ export const ConversaCard = ({
     diasRestantes: number;
     dataRetorno: Date | null;
   } | null>(null);
+  const [statusModalOpen, setStatusModalOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<CardStatus | null>(null);
   
   const {
     attributes,
@@ -90,6 +98,12 @@ export const ConversaCard = ({
   const handleAgendarClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     onAgendarClick?.();
+  };
+
+  const handleStatusClick = (e: React.MouseEvent, status: CardStatus) => {
+    e.stopPropagation();
+    setSelectedStatus(status);
+    setStatusModalOpen(true);
   };
 
   const renderAtividadeBadge = () => {
@@ -196,10 +210,47 @@ export const ConversaCard = ({
           </div>
         </div>
 
-        {/* Indicador de atividade */}
-        {renderAtividadeBadge()}
+        <div className="flex items-center justify-between mt-2">
+          <div className="flex items-center gap-2">
+            {renderAtividadeBadge()}
+            {renderStatusBadge()}
+          </div>
+        </div>
 
-        {renderStatusBadge()}
+        {/* Botões de Status */}
+        <div className="flex gap-2 mt-3 pt-3 border-t">
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 text-green-600 hover:bg-green-50"
+            onClick={(e) => handleStatusClick(e, 'ganho')}
+          >
+            <CheckCircle2 className="h-3 w-3 mr-1" />
+            Ganho
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="flex-1 text-red-600 hover:bg-red-50"
+            onClick={(e) => handleStatusClick(e, 'perdido')}
+          >
+            <XCircle className="h-3 w-3 mr-1" />
+            Perdido
+          </Button>
+        </div>
+
+        {selectedStatus && (
+          <CardStatusModal
+            isOpen={statusModalOpen}
+            onClose={() => {
+              setStatusModalOpen(false);
+              setSelectedStatus(null);
+            }}
+            cardId={id}
+            funilId={funilId}
+            status={selectedStatus}
+          />
+        )}
       </div>
     </Card>
   );

@@ -5,6 +5,9 @@ import { AtividadeCard } from '@/types/database';
 import { Clock, User, Phone, Mail } from 'lucide-react';
 import { format, addDays, isToday, isTomorrow, isBefore, isAfter } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { useKanbanColors } from '@/hooks/useKanbanColors';
+import { useState } from 'react';
+import { AtividadeRetornoModal } from './AtividadeRetornoModal';
 
 interface AtividadesKanbanProps {
   filters: {
@@ -26,6 +29,8 @@ const getActivityIcon = (tipo: string) => {
 };
 
 export const AtividadesKanban = ({ filters }: AtividadesKanbanProps) => {
+  const { colors } = useKanbanColors();
+  const [selectedAtividade, setSelectedAtividade] = useState<any | null>(null);
   const { data: atividades = [], isLoading } = useQuery({
     queryKey: ['atividades-kanban', filters],
     queryFn: async () => {
@@ -70,7 +75,11 @@ export const AtividadesKanban = ({ filters }: AtividadesKanbanProps) => {
   };
 
   const renderCard = (atividade: any) => (
-    <Card key={atividade.id} className="mb-3 cursor-pointer hover:shadow-md transition-shadow">
+    <Card
+      key={atividade.id}
+      className="mb-3 cursor-pointer hover:shadow-md transition-shadow"
+      onClick={() => setSelectedAtividade(atividade)}
+    >
       <CardContent className="p-4">
         <div className="flex items-start gap-2">
           <div className="mt-1">{getActivityIcon(atividade.tipo)}</div>
@@ -96,51 +105,65 @@ export const AtividadesKanban = ({ filters }: AtividadesKanbanProps) => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-      {/* Coluna HOJE */}
-      <div>
-        <div className="bg-primary/10 p-3 rounded-t-lg">
-          <h3 className="font-semibold">HOJE ({colunas.hoje.length})</h3>
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+        {/* Coluna HOJE */}
+        <div>
+          <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.hoje }}>
+            <h3 className="font-semibold text-white">HOJE ({colunas.hoje.length})</h3>
+          </div>
+          <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
+            {colunas.hoje.map(renderCard)}
+            {colunas.hoje.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhuma atividade para hoje
+              </p>
+            )}
+          </div>
         </div>
-        <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
-          {colunas.hoje.map(renderCard)}
-          {colunas.hoje.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhuma atividade para hoje
-            </p>
-          )}
+
+        {/* Coluna AMANHÃ */}
+        <div>
+          <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.amanha }}>
+            <h3 className="font-semibold text-white">AMANHÃ ({colunas.amanha.length})</h3>
+          </div>
+          <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
+            {colunas.amanha.map(renderCard)}
+            {colunas.amanha.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhuma atividade para amanhã
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Coluna PRÓXIMOS 7 DIAS */}
+        <div>
+          <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.proxima }}>
+            <h3 className="font-semibold text-white">PRÓXIMOS 7 DIAS ({colunas.proxima.length})</h3>
+          </div>
+          <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
+            {colunas.proxima.map(renderCard)}
+            {colunas.proxima.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Nenhuma atividade nos próximos dias
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Coluna AMANHÃ */}
-      <div>
-        <div className="bg-secondary/30 p-3 rounded-t-lg">
-          <h3 className="font-semibold">AMANHÃ ({colunas.amanha.length})</h3>
-        </div>
-        <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
-          {colunas.amanha.map(renderCard)}
-          {colunas.amanha.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhuma atividade para amanhã
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Coluna PRÓXIMOS 7 DIAS */}
-      <div>
-        <div className="bg-accent/30 p-3 rounded-t-lg">
-          <h3 className="font-semibold">PRÓXIMOS 7 DIAS ({colunas.proxima.length})</h3>
-        </div>
-        <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
-          {colunas.proxima.map(renderCard)}
-          {colunas.proxima.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-8">
-              Nenhuma atividade nos próximos dias
-            </p>
-          )}
-        </div>
-      </div>
-    </div>
+      {selectedAtividade && (
+        <AtividadeRetornoModal
+          isOpen={!!selectedAtividade}
+          onClose={() => setSelectedAtividade(null)}
+          atividade={selectedAtividade}
+          onSuccess={() => {
+            setSelectedAtividade(null);
+            // refetch será feito automaticamente pelo react-query
+          }}
+        />
+      )}
+    </>
   );
 };

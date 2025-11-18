@@ -26,6 +26,8 @@ import { FunilModal } from "@/components/FunilModal";
 import { FunilActions } from "@/components/FunilActions";
 import { EtapasModal } from "@/components/EtapasModal";
 import type { Funil } from "@/types/database";
+import { usePipelineFilters } from "@/utils/pipelineFilters";
+import { PipelineFilters } from "@/components/PipelineFilters";
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
@@ -44,6 +46,8 @@ const Dashboard = () => {
   const [isTestingCycle, setIsTestingCycle] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const pageSize = 50;
+  
+  const { filters, setFilters, applyFilters } = usePipelineFilters();
   
   const { data: funis, isLoading: isLoadingFunis } = useFunis();
   const { data: etapas, isLoading: isLoadingEtapas } = useEtapas(selectedFunilId);
@@ -462,6 +466,20 @@ const Dashboard = () => {
             </AlertDescription>
           </Alert>
         )}
+
+        {/* Filtros Avançados */}
+        <PipelineFilters
+          filters={filters}
+          setFilters={setFilters}
+          onClear={() => setFilters({
+            status: 'ativo',
+            leadName: '',
+            productId: null,
+            openedFrom: null,
+            openedTo: null,
+            funilId: null,
+          })}
+        />
 
         {/* Funil Selector */}
         <div className="mb-6">
