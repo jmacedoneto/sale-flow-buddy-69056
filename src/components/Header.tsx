@@ -24,7 +24,7 @@ export const Header = () => {
         <div className="flex items-center justify-between gap-4">
           {/* Logo e Status */}
           <div className="flex items-center gap-3">
-            <Link to="/" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+            <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
               <LayoutDashboard className="h-6 w-6 text-primary" />
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-foreground">CRM APVS</h1>
