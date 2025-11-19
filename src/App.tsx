@@ -37,8 +37,9 @@ const AppContent = () => {
         <Route path="/dashboard-administrativo" element={<ProtectedRoute><DashboardAdministrativo /></ProtectedRoute>} />
         <Route path="/atividades" element={<ProtectedRoute><Atividades /></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
-        <Route path="/configuracoes-users" element={<ProtectedRoute><ConfiguracoesUsers /></ProtectedRoute>} />
-        <Route path="/usuarios-permissoes" element={<ProtectedRoute><UsuariosPermissoes /></ProtectedRoute>} />
+        {/* Rotas antigas redirecionam para configurações */}
+        <Route path="/configuracoes-users" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+        <Route path="/usuarios-permissoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
         <Route path="/negociacoes-pausadas" element={<ProtectedRoute><NegociacoesPausadas /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>

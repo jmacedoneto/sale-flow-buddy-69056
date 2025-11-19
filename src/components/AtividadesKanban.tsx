@@ -1,13 +1,16 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { AtividadeCard } from '@/types/database';
 import { Clock, User, Phone, Mail } from 'lucide-react';
-import { format, addDays, isToday, isTomorrow, isBefore, isAfter, differenceInDays } from 'date-fns';
+import { format, addDays, isToday, isTomorrow, isBefore, isAfter, differenceInDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useKanbanColors } from '@/hooks/useKanbanColors';
 import { useState } from 'react';
 import { AtividadeDetailsModal } from './AtividadeDetailsModal';
+import { toast } from 'sonner';
+import { DndContext, DragEndEvent, closestCenter } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 
 interface AtividadesKanbanProps {
   filters: {
@@ -35,6 +38,7 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
   const { colors } = useKanbanColors();
   const [selectedAtividade, setSelectedAtividade] = useState<any | null>(null);
   const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
+  const queryClient = useQueryClient();
   
   const { data: atividades = [], isLoading, refetch } = useQuery({
     queryKey: ['atividades-kanban', filters, mostrarConcluidas],
@@ -82,22 +86,63 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
     },
   });
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+  const hoje = startOfDay(new Date());
   const amanha = addDays(hoje, 1);
   const seteDias = addDays(hoje, 7);
 
-  // Organizar atividades por prazo (operacional)
+  // Organizar atividades por prazo (operacional) - apenas pendentes
+  const atividadesPendentes = atividades.filter(a => a.status !== 'concluida');
+  const atividadesConcluidas = atividades.filter(a => a.status === 'concluida');
+
   const colunas = {
-    vencidas: atividades.filter((a) => a.data_prevista && isBefore(new Date(a.data_prevista), hoje)),
-    hoje: atividades.filter((a) => a.data_prevista && isToday(new Date(a.data_prevista))),
-    amanha: atividades.filter((a) => a.data_prevista && isTomorrow(new Date(a.data_prevista))),
-    estaSemana: atividades.filter(
+    vencidas: atividadesPendentes.filter((a) => a.data_prevista && isBefore(startOfDay(new Date(a.data_prevista)), hoje)),
+    hoje: atividadesPendentes.filter((a) => a.data_prevista && isToday(new Date(a.data_prevista))),
+    amanha: atividadesPendentes.filter((a) => a.data_prevista && isTomorrow(new Date(a.data_prevista))),
+    estaSemana: atividadesPendentes.filter(
       (a) =>
         a.data_prevista &&
         isAfter(new Date(a.data_prevista), amanha) &&
         isBefore(new Date(a.data_prevista), seteDias)
     ),
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const atividadeId = active.id as string;
+    const targetColumn = over.id as string;
+    
+    let novaData: Date;
+    
+    switch (targetColumn) {
+      case 'hoje':
+        novaData = hoje;
+        break;
+      case 'amanha':
+        novaData = amanha;
+        break;
+      case 'estaSemana':
+        novaData = addDays(hoje, 3);
+        break;
+      default:
+        return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('atividades_cards')
+        .update({ data_prevista: format(novaData, 'yyyy-MM-dd') })
+        .eq('id', atividadeId);
+
+      if (error) throw error;
+      
+      toast.success('Atividade reagendada');
+      queryClient.invalidateQueries({ queryKey: ['atividades-kanban'] });
+    } catch (error) {
+      console.error('Erro ao reagendar atividade:', error);
+      toast.error('Erro ao reagendar atividade');
+    }
   };
 
   const renderCard = (atividade: any) => {
@@ -144,52 +189,86 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
-        {/* Coluna HOJE */}
-        <div>
-          <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.hoje }}>
-            <h3 className="font-semibold text-white">HOJE ({colunas.hoje.length})</h3>
+      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4">
+          {/* Coluna VENCIDAS */}
+          <div>
+            <div className="p-3 rounded-t-lg bg-red-500">
+              <h3 className="font-semibold text-white">VENCIDAS ({colunas.vencidas.length})</h3>
+            </div>
+            <SortableContext items={colunas.vencidas.map(a => a.id)} strategy={verticalListSortingStrategy}>
+              <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
+                {colunas.vencidas.map(renderCard)}
+                {colunas.vencidas.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma atividade vencida
+                  </p>
+                )}
+              </div>
+            </SortableContext>
           </div>
-          <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
-            {colunas.hoje.map(renderCard)}
-            {colunas.hoje.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Nenhuma atividade para hoje
-              </p>
-            )}
-          </div>
-        </div>
 
-        {/* Coluna AMANHÃ */}
-        <div>
-          <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.amanha }}>
-            <h3 className="font-semibold text-white">AMANHÃ ({colunas.amanha.length})</h3>
+          {/* Coluna HOJE */}
+          <div>
+            <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.hoje }}>
+              <h3 className="font-semibold text-white">HOJE ({colunas.hoje.length})</h3>
+            </div>
+            <SortableContext items={colunas.hoje.map(a => a.id)} strategy={verticalListSortingStrategy}>
+              <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]" id="hoje">
+                {colunas.hoje.map(renderCard)}
+                {colunas.hoje.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma atividade para hoje
+                  </p>
+                )}
+              </div>
+            </SortableContext>
           </div>
-          <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
-            {colunas.amanha.map(renderCard)}
-            {colunas.amanha.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Nenhuma atividade para amanhã
-              </p>
-            )}
-          </div>
-        </div>
 
-        {/* Coluna PRÓXIMOS 7 DIAS */}
-        <div>
-          <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.proxima }}>
-            <h3 className="font-semibold text-white">PRÓXIMOS 7 DIAS ({colunas.estaSemana.length})</h3>
+          {/* Coluna AMANHÃ */}
+          <div>
+            <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.amanha }}>
+              <h3 className="font-semibold text-white">AMANHÃ ({colunas.amanha.length})</h3>
+            </div>
+            <SortableContext items={colunas.amanha.map(a => a.id)} strategy={verticalListSortingStrategy}>
+              <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]" id="amanha">
+                {colunas.amanha.map(renderCard)}
+                {colunas.amanha.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma atividade para amanhã
+                  </p>
+                )}
+              </div>
+            </SortableContext>
           </div>
-          <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
-            {colunas.estaSemana.map(renderCard)}
-            {colunas.estaSemana.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                Nenhuma atividade nos próximos dias
-              </p>
-            )}
+
+          {/* Coluna PRÓXIMOS 7 DIAS */}
+          <div>
+            <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.proxima }}>
+              <h3 className="font-semibold text-white">PRÓXIMOS 7 DIAS ({colunas.estaSemana.length})</h3>
+            </div>
+            <SortableContext items={colunas.estaSemana.map(a => a.id)} strategy={verticalListSortingStrategy}>
+              <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]" id="estaSemana">
+                {colunas.estaSemana.map(renderCard)}
+                {colunas.estaSemana.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">
+                    Nenhuma atividade nos próximos dias
+                  </p>
+                )}
+              </div>
+            </SortableContext>
           </div>
         </div>
-      </div>
+      </DndContext>
+
+      {mostrarConcluidas && atividadesConcluidas.length > 0 && (
+        <div className="p-4">
+          <h3 className="font-semibold mb-3">Atividades Concluídas ({atividadesConcluidas.length})</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {atividadesConcluidas.map(renderCard)}
+          </div>
+        </div>
+      )}
 
       {selectedAtividade && (
         <AtividadeDetailsModal
