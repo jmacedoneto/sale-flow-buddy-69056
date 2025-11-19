@@ -222,7 +222,7 @@ export const ConversaCard = ({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-green-600 hover:bg-green-50"
+            className="flex-1 text-green-600 hover:bg-green-50 hover:text-green-700"
             onClick={(e) => handleStatusClick(e, 'ganho')}
           >
             <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -231,7 +231,7 @@ export const ConversaCard = ({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-red-600 hover:bg-red-50"
+            className="flex-1 text-red-600 hover:bg-red-50 hover:text-red-700"
             onClick={(e) => handleStatusClick(e, 'perdido')}
           >
             <XCircle className="h-3 w-3 mr-1" />
