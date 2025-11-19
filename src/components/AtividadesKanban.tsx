@@ -191,13 +191,13 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
       </div>
 
       {selectedAtividade && (
-        <AtividadeRetornoModal
+        <AtividadeDetailsModal
           isOpen={!!selectedAtividade}
           onClose={() => setSelectedAtividade(null)}
           atividade={selectedAtividade}
           onSuccess={() => {
+            refetch();
             setSelectedAtividade(null);
-            // refetch será feito automaticamente pelo react-query
           }}
         />
       )}
