@@ -29,6 +29,7 @@ import type { Funil } from "@/types/database";
 import { usePipelineFilters } from "@/utils/pipelineFilters";
 import { PipelineFilters } from "@/components/PipelineFilters";
 import { DashboardResumo } from "@/components/DashboardResumo";
+import { useKanbanColors } from "@/hooks/useKanbanColors";
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
@@ -59,6 +60,7 @@ const Dashboard = () => {
   const { data: semTarefasCount } = useCardsSemTarefa();
   const agendarEmLote = useAgendarTarefasEmLote();
   const moveCard = useMoveCard();
+  const { colors: kanbanColors } = useKanbanColors();
 
   // Verificar se há cardId na URL e abrir modal
   useEffect(() => {
@@ -637,17 +639,28 @@ const Dashboard = () => {
                   onDragEnd={handleDragEnd}
                 >
                   <div className="flex gap-4 overflow-x-auto pb-4">
-                    {etapas.map((etapa) => (
-                      <EtapaColumn
-                        key={etapa.id}
-                        etapaId={etapa.id}
-                        nome={etapa.nome}
-                        cards={getCardsForEtapa(etapa.id)}
-                        totalCards={allCards?.filter(c => c.etapa_id === etapa.id).length || 0}
-                        onCardClick={handleCardClick}
-                        onAgendarClick={handleAgendarCard}
-                      />
-                    ))}
+                    {etapas.map((etapa, index) => {
+                      // Mapear cores do kanban para as etapas (rotaciona entre as 3 cores)
+                      const colorMap: Record<number, string> = {
+                        0: kanbanColors.hoje,
+                        1: kanbanColors.amanha,
+                        2: kanbanColors.proxima,
+                      };
+                      
+                      return (
+                        <EtapaColumn
+                          key={etapa.id}
+                          etapaId={etapa.id}
+                          nome={etapa.nome}
+                          cards={getCardsForEtapa(etapa.id)}
+                          totalCards={allCards?.filter(c => c.etapa_id === etapa.id).length || 0}
+                          onCardClick={handleCardClick}
+                          onAgendarClick={handleAgendarCard}
+                          stageColor={colorMap[index % 3]}
+                          stageIndex={index}
+                        />
+                      );
+                    })}
                   </div>
                   <DragOverlay>
                     {activeCard ? (
