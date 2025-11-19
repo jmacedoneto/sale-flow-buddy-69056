@@ -14,8 +14,6 @@ import DashboardComercial from "./pages/DashboardComercial";
 import DashboardAdministrativo from "./pages/DashboardAdministrativo";
 import Atividades from "./pages/Atividades";
 import Configuracoes from "./pages/Configuracoes";
-import ConfiguracoesUsers from "./pages/ConfiguracoesUsers";
-import UsuariosPermissoes from "./pages/UsuariosPermissoes";
 import NegociacoesPausadas from "./pages/NegociacoesPausadas";
 import NotFound from "./pages/NotFound";
 

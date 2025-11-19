@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { AtividadesKanban } from "@/components/AtividadesKanban";
 import { AtividadesLista } from "@/components/AtividadesLista";
@@ -21,12 +21,23 @@ export default function Atividades() {
   const [prioridade, setPrioridade] = useState<PrioridadeFilter>('todas');
   const [periodo, setPeriodo] = useState<PeriodoFilter>('todos');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
-  const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
+  
+  // P9: Persistir toggle "Mostrar concluídas" em localStorage
+  const [mostrarConcluidas, setMostrarConcluidas] = useState(() => {
+    const saved = localStorage.getItem('atividades-mostrar-concluidas');
+    return saved === 'true';
+  });
+
   const [filters, setFilters] = useState({
     produto: null as string | null,
     funil: null as string | null,
     usuario: null as string | null,
   });
+
+  // P9: Sincronizar toggle com localStorage
+  useEffect(() => {
+    localStorage.setItem('atividades-mostrar-concluidas', String(mostrarConcluidas));
+  }, [mostrarConcluidas]);
 
   const { data: produtos = [] } = useQuery({
     queryKey: ['produtos'],
