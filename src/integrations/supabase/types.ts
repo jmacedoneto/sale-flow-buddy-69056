@@ -190,6 +190,7 @@ export type Database = {
           prioridade: string | null
           resumo: string | null
           resumo_comercial: string | null
+          resumo_generated_at: string | null
           sla_vencimento: string | null
           status: string | null
           titulo: string
@@ -214,6 +215,7 @@ export type Database = {
           prioridade?: string | null
           resumo?: string | null
           resumo_comercial?: string | null
+          resumo_generated_at?: string | null
           sla_vencimento?: string | null
           status?: string | null
           titulo: string
@@ -238,6 +240,7 @@ export type Database = {
           prioridade?: string | null
           resumo?: string | null
           resumo_comercial?: string | null
+          resumo_generated_at?: string | null
           sla_vencimento?: string | null
           status?: string | null
           titulo?: string

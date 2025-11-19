@@ -21,12 +21,13 @@ interface ChatInboxProps {
 export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) => {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [pollingInterval, setPollingInterval] = useState(10000); // P7: Intervalo dinâmico
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const { canEditFunil } = usePermissions();
   const canSendMessages = funilId ? canEditFunil(funilId) : false;
 
-  // Buscar mensagens com polling de 10 segundos
+  // Buscar mensagens
   const { data: messages = [], isLoading, error, refetch } = useChatwootMessages(conversationId);
 
   // Auto-scroll para última mensagem
@@ -36,16 +37,23 @@ export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) =
     }
   }, [messages]);
 
-  // Polling quando o componente está montado - somente se não houver erro
+  // P7: Polling com exponential backoff
   useEffect(() => {
-    if (error) return; // Não faz polling se houver erro
+    if (error) {
+      // Se houver erro, aumentar intervalo progressivamente (máx 60s)
+      setPollingInterval(prev => Math.min(prev * 1.5, 60000));
+      return;
+    }
+
+    // Reset para intervalo base se não houver erro
+    setPollingInterval(10000);
     
     const interval = setInterval(() => {
       refetch();
-    }, 10000); // 10 segundos
+    }, pollingInterval);
 
     return () => clearInterval(interval);
-  }, [refetch, error]);
+  }, [refetch, error, pollingInterval]);
 
   const handleSend = async () => {
     if (!message.trim() || !canSendMessages) return;

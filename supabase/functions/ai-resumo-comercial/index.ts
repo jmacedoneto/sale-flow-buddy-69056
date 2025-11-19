@@ -12,9 +12,13 @@ serve(async (req) => {
   }
 
   try {
-    const { conversationId, cardId } = await req.json();
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    const { card_id: cardId } = await req.json();
     
+    if (!cardId) {
+      throw new Error('card_id é obrigatório');
+    }
+
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     if (!LOVABLE_API_KEY) {
       throw new Error('LOVABLE_API_KEY não configurada');
     }
@@ -23,19 +27,46 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
+    // P4: Verificar cache de resumo (< 24h)
+    const { data: card } = await supabase
+      .from('cards_conversas')
+      .select('resumo_comercial, resumo_generated_at, chatwoot_conversa_id')
+      .eq('id', cardId)
+      .single();
+
+    if (!card) {
+      throw new Error('Card não encontrado');
+    }
+
+    // Se existe resumo recente (< 24h), retornar cache
+    if (card.resumo_comercial && card.resumo_generated_at) {
+      const horasCacheadas = (Date.now() - new Date(card.resumo_generated_at).getTime()) / (1000 * 60 * 60);
+      if (horasCacheadas < 24) {
+        console.log(`[ai-resumo] Cache hit para card ${cardId} (${horasCacheadas.toFixed(1)}h)`);
+        return new Response(JSON.stringify({ resumo: card.resumo_comercial, cached: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
+
+    // Cache inválido ou inexistente - gerar novo resumo
+    if (!card.chatwoot_conversa_id) {
+      throw new Error('Card não possui conversa do Chatwoot vinculada');
+    }
+
     // Buscar configuração de prompt
     const { data: config } = await supabase
       .from('ai_config')
       .select('prompt_resumo_comercial')
       .limit(1)
-      .single();
+      .maybeSingle();
 
     const systemPrompt = config?.prompt_resumo_comercial || 
       'Analise a conversa e forneça um resumo comercial CONCISO em no máximo 2 parágrafos curtos. Inclua: 1) Probabilidade de fechamento (%), 2) Principal objeção, 3) Próximo passo.';
 
     // Buscar mensagens do Chatwoot
     const { data: messagesData } = await supabase.functions.invoke('get-chatwoot-messages', {
-      body: { conversationId },
+      body: { conversationId: card.chatwoot_conversa_id },
     });
 
     if (!messagesData?.messages || messagesData.messages.length === 0) {
@@ -59,7 +90,7 @@ serve(async (req) => {
           { role: 'system', content: `${systemPrompt}\n\nRESPONDA EM NO MÁXIMO 2 PARÁGRAFOS CURTOS E DIRETOS.` },
           { role: 'user', content: `Analise esta conversa comercial:\n\n${conversationHistory}` },
         ],
-        max_tokens: 200, // Limitar resposta
+        max_tokens: 200,
       }),
     });
 
@@ -82,18 +113,24 @@ serve(async (req) => {
     const data = await response.json();
     const resumo = data.choices?.[0]?.message?.content || 'Não foi possível gerar o resumo.';
 
-    // Salvar resumo no card
+    // P4: Salvar resumo + timestamp no card
     await supabase
       .from('cards_conversas')
-      .update({ resumo_comercial: resumo })
+      .update({ 
+        resumo_comercial: resumo,
+        resumo_generated_at: new Date().toISOString()
+      })
       .eq('id', cardId);
 
-    return new Response(JSON.stringify({ resumo }), {
+    console.log(`[ai-resumo] Novo resumo gerado para card ${cardId}`);
+
+    return new Response(JSON.stringify({ resumo, cached: false }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('[ai-resumo-comercial] Erro:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

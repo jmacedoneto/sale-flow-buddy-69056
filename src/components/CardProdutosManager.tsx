@@ -31,21 +31,43 @@ export const CardProdutosManager = ({ cardId }: CardProdutosManagerProps) => {
   });
 
   const adicionarMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
+      // P6: Verificar duplicata antes de adicionar
+      const produtoExistente = cardProdutos?.find(cp => cp.produto_id === produtoSelecionado);
+      
+      if (produtoExistente) {
+        // Produto já existe - incrementar quantidade
+        const novaQuantidade = produtoExistente.quantidade + parseInt(quantidade);
+        return cardProdutosService.atualizarProdutoCard(produtoExistente.id, {
+          quantidade: novaQuantidade
+        });
+      }
+
+      // Produto novo - adicionar
       const produto = produtos?.find(p => p.id === produtoSelecionado);
       const valorFinal = parseFloat(valor) || produto?.valor_padrao || 0;
       const qtd = parseInt(quantidade) || 1;
       return cardProdutosService.adicionarProdutoCard(cardId, produtoSelecionado, valorFinal, qtd);
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["card-produtos", cardId] });
       queryClient.invalidateQueries({ queryKey: ["cards"] });
-      toast.success("Produto adicionado");
+      
+      const produtoExistente = cardProdutos?.find(cp => cp.produto_id === produtoSelecionado);
+      toast.success(produtoExistente ? "Quantidade atualizada" : "Produto adicionado");
+      
       setProdutoSelecionado("");
       setQuantidade("1");
       setValor("");
     },
-    onError: () => toast.error("Erro ao adicionar produto"),
+    onError: (error: Error) => {
+      // P6: Mensagem específica para constraint de duplicata
+      if (error.message?.includes('unique_card_produto')) {
+        toast.error("Produto já adicionado - atualize a quantidade existente");
+      } else {
+        toast.error("Erro ao adicionar produto");
+      }
+    },
   });
 
   const atualizarMutation = useMutation({
