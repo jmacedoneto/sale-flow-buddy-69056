@@ -8,33 +8,25 @@ import { ChevronDown, ChevronUp, Filter } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { PipelineFilters } from "@/types/filters";
 
 interface PipelineAdvancedFiltersProps {
-  onFiltersChange: (filters: {
-    produto: string;
-    funil: string;
-    statusTarefa: string;
-    statusOportunidade: string;
-    nomeLead: string;
-    dataAbertura: { inicio: string; fim: string };
-  }) => void;
+  onFiltersChange: (filters: PipelineFilters) => void;
 }
 
 const FILTERS_STORAGE_KEY = 'pipeline-filters';
 
 export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFiltersProps) => {
-  // Carregar filtros salvos do localStorage
   const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
   const initialFilters = savedFilters ? JSON.parse(savedFilters) : {};
 
   const [isOpen, setIsOpen] = useState(false);
-  const [produto, setProduto] = useState(initialFilters.produto || "");
-  const [funil, setFunil] = useState(initialFilters.funil || "");
-  const [statusTarefa, setStatusTarefa] = useState(initialFilters.statusTarefa || "");
-  const [statusOportunidade, setStatusOportunidade] = useState(initialFilters.statusOportunidade || "");
-  const [nomeLead, setNomeLead] = useState(initialFilters.nomeLead || "");
-  const [dataInicio, setDataInicio] = useState(initialFilters.dataInicio || "");
-  const [dataFim, setDataFim] = useState(initialFilters.dataFim || "");
+  const [produto, setProduto] = useState(initialFilters.productId || "");
+  const [funil, setFunil] = useState(initialFilters.funilId || "");
+  const [status, setStatus] = useState<PipelineFilters['status']>(initialFilters.status || "ativo");
+  const [nomeLead, setNomeLead] = useState(initialFilters.leadName || "");
+  const [dataInicio, setDataInicio] = useState(initialFilters.openedFrom || "");
+  const [dataFim, setDataFim] = useState(initialFilters.openedTo || "");
 
   const { data: produtos } = useQuery({
     queryKey: ['produtos-filter'],
@@ -53,24 +45,23 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
   });
 
   const handleApplyFilters = () => {
-    const filters = {
-      produto,
-      funil,
-      statusTarefa,
-      statusOportunidade,
-      nomeLead,
-      dataAbertura: { inicio: dataInicio, fim: dataFim }
+    const filters: PipelineFilters = {
+      status,
+      leadName: nomeLead,
+      productId: produto || null,
+      funilId: funil || null,
+      openedFrom: dataInicio || null,
+      openedTo: dataFim || null,
     };
     
     // Salvar filtros no localStorage
     localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
-      produto,
-      funil,
-      statusTarefa,
-      statusOportunidade,
-      nomeLead,
-      dataInicio,
-      dataFim
+      status,
+      leadName: nomeLead,
+      productId: produto,
+      funilId: funil,
+      openedFrom: dataInicio,
+      openedTo: dataFim,
     }));
 
     onFiltersChange(filters);
@@ -79,8 +70,7 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
   const handleClearFilters = () => {
     setProduto("");
     setFunil("");
-    setStatusTarefa("");
-    setStatusOportunidade("");
+    setStatus("ativo");
     setNomeLead("");
     setDataInicio("");
     setDataFim("");
@@ -89,12 +79,12 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
     localStorage.removeItem(FILTERS_STORAGE_KEY);
     
     onFiltersChange({
-      produto: "",
-      funil: "",
-      statusTarefa: "",
-      statusOportunidade: "",
-      nomeLead: "",
-      dataAbertura: { inicio: "", fim: "" }
+      status: 'ativo',
+      leadName: '',
+      productId: null,
+      funilId: null,
+      openedFrom: null,
+      openedTo: null,
     });
   };
 
@@ -103,7 +93,7 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
     if (savedFilters) {
       handleApplyFilters();
     }
-  }, []); // Executar apenas uma vez ao montar
+  }, []);
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
@@ -163,29 +153,14 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
               </div>
 
               <div className="space-y-2">
-                <Label>Status da Tarefa</Label>
-                <Select value={statusTarefa} onValueChange={setStatusTarefa}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Todos" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
-                    <SelectItem value="pendente">Pendente</SelectItem>
-                    <SelectItem value="concluida">Concluída</SelectItem>
-                    <SelectItem value="vencida">Vencida</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Status da Oportunidade</Label>
-                <Select value={statusOportunidade} onValueChange={setStatusOportunidade}>
+                <Select value={status} onValueChange={(val) => setStatus(val as PipelineFilters['status'])}>
                   <SelectTrigger>
                     <SelectValue placeholder="Todos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Todos</SelectItem>
-                    <SelectItem value="em_andamento">Ativa</SelectItem>
+                    <SelectItem value="todos">Todos</SelectItem>
+                    <SelectItem value="ativo">Ativa</SelectItem>
                     <SelectItem value="ganho">Ganha</SelectItem>
                     <SelectItem value="perdido">Perdida</SelectItem>
                     <SelectItem value="pausado">Pausada</SelectItem>

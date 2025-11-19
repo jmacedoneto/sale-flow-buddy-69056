@@ -184,6 +184,7 @@ export type Database = {
           funil_id: string | null
           funil_nome: string | null
           id: string
+          last_chatwoot_sync_at: string | null
           motivo_perda_id: string | null
           pausado: boolean | null
           prazo: string | null
@@ -209,6 +210,7 @@ export type Database = {
           funil_id?: string | null
           funil_nome?: string | null
           id?: string
+          last_chatwoot_sync_at?: string | null
           motivo_perda_id?: string | null
           pausado?: boolean | null
           prazo?: string | null
@@ -234,6 +236,7 @@ export type Database = {
           funil_id?: string | null
           funil_nome?: string | null
           id?: string
+          last_chatwoot_sync_at?: string | null
           motivo_perda_id?: string | null
           pausado?: boolean | null
           prazo?: string | null

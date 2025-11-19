@@ -10,31 +10,38 @@ import { AbaProdutos } from "@/components/AbaProdutos";
 import { AbaMotivosPerda } from "@/components/AbaMotivosPerda";
 import { AbaKanbanColors } from "@/components/AbaKanbanColors";
 import { AbaFunis } from "@/components/AbaFunis";
-
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const Configuracoes = () => {
-  const MASTER_EMAIL = 'jmacedoneto1989@gmail.com';
-  
-  // Verificar se usuário é master
-  const { data: currentUser } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
-      
-      const { data } = await supabase
-        .from('users_crm')
-        .select('role, email')
-        .eq('id', user.id)
-        .single();
-      
-      return { ...user, role: data?.role, email: data?.email };
-    }
-  });
+  const { isAdmin, loading } = usePermissions();
+  const navigate = useNavigate();
 
-  const isMaster = currentUser?.role === 'master' || currentUser?.email === MASTER_EMAIL;
+  // Redirecionar não-admins
+  useEffect(() => {
+    if (!loading && !isAdmin) {
+      navigate('/dashboard');
+    }
+  }, [isAdmin, loading, navigate]);
+
+  // Mostrar loading enquanto verifica permissões
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background p-6">
+        <div className="max-w-6xl mx-auto space-y-4">
+          <Skeleton className="h-12 w-64" />
+          <Skeleton className="h-96 w-full" />
+        </div>
+      </div>
+    );
+  }
+
+  // Não renderizar nada se não for admin
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background p-6">
@@ -42,7 +49,7 @@ const Configuracoes = () => {
         <h1 className="text-4xl font-bold mb-8">⚙️ Configurações</h1>
         
         <Tabs defaultValue="chatwoot" className="w-full">
-          <TabsList className={`grid w-full ${isMaster ? 'grid-cols-11' : 'grid-cols-10'}`}>
+          <TabsList className="grid w-full grid-cols-11">
             <TabsTrigger value="chatwoot">Chatwoot</TabsTrigger>
             <TabsTrigger value="webhooks">Webhooks Internos</TabsTrigger>
             <TabsTrigger value="externos">Webhooks Externos</TabsTrigger>
@@ -53,7 +60,7 @@ const Configuracoes = () => {
             <TabsTrigger value="produtos">Produtos</TabsTrigger>
             <TabsTrigger value="motivos-perda">Motivos de Perda</TabsTrigger>
             <TabsTrigger value="kanban-colors">Cores Kanban</TabsTrigger>
-            {isMaster && <TabsTrigger value="usuarios">Usuários</TabsTrigger>}
+            <TabsTrigger value="usuarios">Usuários</TabsTrigger>
           </TabsList>
 
           <TabsContent value="chatwoot" className="mt-6">
@@ -96,11 +103,9 @@ const Configuracoes = () => {
             <AbaKanbanColors />
           </TabsContent>
 
-          {isMaster && (
-            <TabsContent value="usuarios" className="mt-6">
-              <AbaUsuarios />
-            </TabsContent>
-          )}
+          <TabsContent value="usuarios" className="mt-6">
+            <AbaUsuarios />
+          </TabsContent>
 
         </Tabs>
       </div>

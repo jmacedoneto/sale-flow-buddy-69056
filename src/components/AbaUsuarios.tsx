@@ -7,41 +7,27 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { Shield, ExternalLink, Settings } from "lucide-react";
+import { Shield, ExternalLink, Settings, CheckCircle, XCircle, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GerenciarFunisUsuario } from "./GerenciarFunisUsuario";
-
-const MASTER_EMAIL = 'jmacedoneto1989@gmail.com';
+import { usePermissions } from "@/hooks/usePermissions";
+import { useUpdateUserStatus, type UserStatus } from "@/hooks/useUpdateUserStatus";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const AbaUsuarios = () => {
   const queryClient = useQueryClient();
   const [gerenciarFunisOpen, setGerenciarFunisOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{ id: string; nome: string } | null>(null);
+  const [statusTab, setStatusTab] = useState<'todos' | 'pending' | 'approved' | 'blocked'>('todos');
 
-  // Verificar se usuário é master
-  const { data: currentUser } = useQuery({
-    queryKey: ['currentUser'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Não autenticado');
-      
-      const { data } = await supabase
-        .from('users_crm')
-        .select('role, email')
-        .eq('id', user.id)
-        .single();
-      
-      return { ...user, role: data?.role, email: data?.email };
-    }
-  });
-
-  const isMaster = currentUser?.role === 'master' || currentUser?.email === MASTER_EMAIL;
+  const { isAdmin, loading: permissionsLoading } = usePermissions();
+  const updateUserStatus = useUpdateUserStatus();
 
   // Listar usuários
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
-      if (!isMaster) return [];
+      if (!isAdmin) return [];
 
       const { data, error } = await supabase
         .from('users_crm')
@@ -51,27 +37,9 @@ export const AbaUsuarios = () => {
       if (error) throw error;
       return data;
     },
-    enabled: isMaster
+    enabled: isAdmin
   });
 
-  // Mutation para aprovar usuário
-  const approveMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      const { error } = await supabase
-        .from('users_crm')
-        .update({ approved: true })
-        .eq('id', userId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      toast.success('Usuário aprovado com sucesso!');
-      queryClient.invalidateQueries({ queryKey: ['users'] });
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Erro ao aprovar usuário');
-    }
-  });
 
   // Mutation para atualizar permissões
   const updatePermissionsMutation = useMutation({
@@ -110,16 +78,42 @@ export const AbaUsuarios = () => {
     }
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'master': return '👑 Master';
-      case 'admin': return 'Administrador';
-      case 'manager': return 'Gerente';
-      case 'agent': return 'Agente';
-      case 'viewer': return 'Visualizador';
-      default: return role;
+  const getStatusBadge = (status: string | null) => {
+    if (!status) return { variant: 'outline' as const, label: 'Desconhecido', icon: null };
+    
+    switch (status) {
+      case 'pending':
+        return { variant: 'secondary' as const, label: 'Pendente', icon: <Clock className="h-3 w-3" /> };
+      case 'approved':
+        return { variant: 'default' as const, label: 'Aprovado', icon: <CheckCircle className="h-3 w-3" /> };
+      case 'blocked':
+        return { variant: 'destructive' as const, label: 'Bloqueado', icon: <XCircle className="h-3 w-3" /> };
+      default:
+        return { variant: 'outline' as const, label: status, icon: null };
     }
   };
+
+  // Filtrar usuários por status
+  const filteredUsers = users?.filter(user => {
+    if (statusTab === 'todos') return true;
+    return user.status === statusTab;
+  }) || [];
+
+  if (permissionsLoading) {
+    return <div className="p-4">Carregando permissões...</div>;
+  }
+
+  if (!isAdmin) {
+    return (
+      <Alert>
+        <Shield className="h-4 w-4" />
+        <AlertTitle>Acesso Restrito</AlertTitle>
+        <AlertDescription>
+          Apenas administradores podem gerenciar usuários.
+        </AlertDescription>
+      </Alert>
+    );
+  }
 
   if (!isMaster) {
     return (
