@@ -7,13 +7,16 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
-import { Shield, ExternalLink } from "lucide-react";
+import { Shield, ExternalLink, Settings } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { GerenciarFunisUsuario } from "./GerenciarFunisUsuario";
 
 const MASTER_EMAIL = 'jmacedoneto1989@gmail.com';
 
 export const AbaUsuarios = () => {
   const queryClient = useQueryClient();
+  const [gerenciarFunisOpen, setGerenciarFunisOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<{ id: string; nome: string } | null>(null);
 
   // Verificar se usuário é master
   const { data: currentUser } = useQuery({
@@ -281,16 +284,29 @@ export const AbaUsuarios = () => {
                       <span className="text-xs text-muted-foreground">Todas</span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {!user.approved && (
+                  <TableCell className="text-right">
+                    <div className="flex gap-2 justify-end">
+                      {!user.approved && (
+                        <Button
+                          size="sm"
+                          onClick={() => approveMutation.mutate(user.id)}
+                          disabled={approveMutation.isPending}
+                        >
+                          ✓ Aprovar
+                        </Button>
+                      )}
                       <Button
                         size="sm"
-                        onClick={() => approveMutation.mutate(user.id)}
-                        disabled={approveMutation.isPending}
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedUser({ id: user.id, nome: user.nome || user.email });
+                          setGerenciarFunisOpen(true);
+                        }}
                       >
-                        ✓ Aprovar
+                        <Settings className="h-4 w-4 mr-2" />
+                        Funis
                       </Button>
-                    )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     {user.created_at ? new Date(user.created_at).toLocaleDateString('pt-BR') : '—'}
@@ -300,6 +316,15 @@ export const AbaUsuarios = () => {
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {selectedUser && (
+        <GerenciarFunisUsuario
+          open={gerenciarFunisOpen}
+          onOpenChange={setGerenciarFunisOpen}
+          userId={selectedUser.id}
+          userName={selectedUser.nome}
+        />
       )}
     </div>
   );

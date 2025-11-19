@@ -25,8 +25,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { ModalMotivoPerda } from "./ModalMotivoPerda";
 import { CardProdutosManager } from "./CardProdutosManager";
 import { useChatwootConfig } from "@/hooks/useChatwootConfig";
-import { syncCardFromChatwoot } from "@/services/chatwootSyncService";
 import { RefreshCw } from "lucide-react";
+import { useAutosave } from "@/hooks/useAutosave";
+import { useSyncCardFromChatwoot } from "@/hooks/useSyncCardFromChatwoot";
 
 interface CardDetailsModalProps {
   card: CardConversa | null;
@@ -44,7 +45,6 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   const [etapaId, setEtapaId] = useState<string>("");
   const [isGeneratingResumo, setIsGeneratingResumo] = useState(false);
   const [modalPerdaOpen, setModalPerdaOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   
   // Follow-up form states
   const [followUpData, setFollowUpData] = useState<Date | undefined>(
@@ -59,6 +59,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   const { data: funis } = useFunis();
   const { data: etapas } = useEtapas(funilId || null);
   const { config } = useChatwootConfig();
+  const syncMutation = useSyncCardFromChatwoot();
 
   useEffect(() => {
     if (card) {
@@ -75,6 +76,39 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
       }
     }
   }, [card]);
+
+  // Autosave para título com debounce
+  useEffect(() => {
+    if (!card) return;
+    const timeoutId = setTimeout(() => {
+      if (titulo.trim() !== (card.titulo || '').trim()) {
+        updateCard.mutate({ id: card.id, updates: { titulo: titulo.trim() } });
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [titulo, card]);
+
+  // Autosave para descrição com debounce
+  useEffect(() => {
+    if (!card) return;
+    const timeoutId = setTimeout(() => {
+      if (descricaoDetalhada.trim() !== (card.descricao_detalhada || '').trim()) {
+        updateCard.mutate({ id: card.id, updates: { descricao_detalhada: descricaoDetalhada.trim() || null } });
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [descricaoDetalhada, card]);
+
+  // Autosave para prioridade com debounce
+  useEffect(() => {
+    if (!card) return;
+    const timeoutId = setTimeout(() => {
+      if (prioridade !== (card.prioridade || '')) {
+        updateCard.mutate({ id: card.id, updates: { prioridade: prioridade || null } });
+      }
+    }, 500);
+    return () => clearTimeout(timeoutId);
+  }, [prioridade, card]);
 
   const handleSave = async () => {
     if (!card) return;
