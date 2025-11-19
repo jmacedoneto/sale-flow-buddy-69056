@@ -87,11 +87,12 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
   const amanha = addDays(hoje, 1);
   const seteDias = addDays(hoje, 7);
 
+  // Organizar atividades por prazo (operacional)
   const colunas = {
     vencidas: atividades.filter((a) => a.data_prevista && isBefore(new Date(a.data_prevista), hoje)),
     hoje: atividades.filter((a) => a.data_prevista && isToday(new Date(a.data_prevista))),
     amanha: atividades.filter((a) => a.data_prevista && isTomorrow(new Date(a.data_prevista))),
-    proxima: atividades.filter(
+    estaSemana: atividades.filter(
       (a) =>
         a.data_prevista &&
         isAfter(new Date(a.data_prevista), amanha) &&

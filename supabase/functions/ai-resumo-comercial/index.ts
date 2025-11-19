@@ -31,7 +31,7 @@ serve(async (req) => {
       .single();
 
     const systemPrompt = config?.prompt_resumo_comercial || 
-      'Analise a conversa e forneça: 1) Probabilidade de fechamento (0-100%), 2) Principais objeções identificadas, 3) Próximos passos recomendados.';
+      'Analise a conversa e forneça um resumo comercial CONCISO em no máximo 2 parágrafos curtos. Inclua: 1) Probabilidade de fechamento (%), 2) Principal objeção, 3) Próximo passo.';
 
     // Buscar mensagens do Chatwoot
     const { data: messagesData } = await supabase.functions.invoke('get-chatwoot-messages', {
@@ -39,7 +39,7 @@ serve(async (req) => {
     });
 
     if (!messagesData?.messages || messagesData.messages.length === 0) {
-      throw new Error('Nenhuma mensagem encontrada');
+      throw new Error('Nenhuma mensagem encontrada para análise');
     }
 
     // Formatar mensagens para análise
@@ -56,9 +56,10 @@ serve(async (req) => {
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',
         messages: [
-          { role: 'system', content: systemPrompt },
+          { role: 'system', content: `${systemPrompt}\n\nRESPONDA EM NO MÁXIMO 2 PARÁGRAFOS CURTOS E DIRETOS.` },
           { role: 'user', content: `Analise esta conversa comercial:\n\n${conversationHistory}` },
         ],
+        max_tokens: 200, // Limitar resposta
       }),
     });
 
