@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,15 +20,21 @@ interface PipelineAdvancedFiltersProps {
   }) => void;
 }
 
+const FILTERS_STORAGE_KEY = 'pipeline-filters';
+
 export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFiltersProps) => {
+  // Carregar filtros salvos do localStorage
+  const savedFilters = localStorage.getItem(FILTERS_STORAGE_KEY);
+  const initialFilters = savedFilters ? JSON.parse(savedFilters) : {};
+
   const [isOpen, setIsOpen] = useState(false);
-  const [produto, setProduto] = useState("");
-  const [funil, setFunil] = useState("");
-  const [statusTarefa, setStatusTarefa] = useState("");
-  const [statusOportunidade, setStatusOportunidade] = useState("");
-  const [nomeLead, setNomeLead] = useState("");
-  const [dataInicio, setDataInicio] = useState("");
-  const [dataFim, setDataFim] = useState("");
+  const [produto, setProduto] = useState(initialFilters.produto || "");
+  const [funil, setFunil] = useState(initialFilters.funil || "");
+  const [statusTarefa, setStatusTarefa] = useState(initialFilters.statusTarefa || "");
+  const [statusOportunidade, setStatusOportunidade] = useState(initialFilters.statusOportunidade || "");
+  const [nomeLead, setNomeLead] = useState(initialFilters.nomeLead || "");
+  const [dataInicio, setDataInicio] = useState(initialFilters.dataInicio || "");
+  const [dataFim, setDataFim] = useState(initialFilters.dataFim || "");
 
   const { data: produtos } = useQuery({
     queryKey: ['produtos-filter'],
@@ -47,14 +53,27 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
   });
 
   const handleApplyFilters = () => {
-    onFiltersChange({
+    const filters = {
       produto,
       funil,
       statusTarefa,
       statusOportunidade,
       nomeLead,
       dataAbertura: { inicio: dataInicio, fim: dataFim }
-    });
+    };
+    
+    // Salvar filtros no localStorage
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({
+      produto,
+      funil,
+      statusTarefa,
+      statusOportunidade,
+      nomeLead,
+      dataInicio,
+      dataFim
+    }));
+
+    onFiltersChange(filters);
   };
 
   const handleClearFilters = () => {
@@ -65,6 +84,10 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
     setNomeLead("");
     setDataInicio("");
     setDataFim("");
+    
+    // Limpar localStorage
+    localStorage.removeItem(FILTERS_STORAGE_KEY);
+    
     onFiltersChange({
       produto: "",
       funil: "",
@@ -74,6 +97,13 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
       dataAbertura: { inicio: "", fim: "" }
     });
   };
+
+  // Aplicar filtros salvos ao montar o componente
+  useEffect(() => {
+    if (savedFilters) {
+      handleApplyFilters();
+    }
+  }, []); // Executar apenas uma vez ao montar
 
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
