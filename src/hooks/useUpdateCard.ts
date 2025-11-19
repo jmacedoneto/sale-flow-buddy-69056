@@ -17,7 +17,7 @@ export const useUpdateCard = () => {
         canEdit: updates.funil_id ? canEditFunil(updates.funil_id) : 'N/A',
       });
 
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("cards_conversas")
         .update(updates)
         .eq("id", id)
