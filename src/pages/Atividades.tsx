@@ -1,21 +1,27 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { AtividadesKanban } from "@/components/AtividadesKanban";
+import { AtividadesLista } from "@/components/AtividadesLista";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Search } from "lucide-react";
+import { ArrowLeft, Search, LayoutList, LayoutGrid } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 type PrioridadeFilter = 'todas' | 'baixa' | 'media' | 'alta' | 'urgente';
 type PeriodoFilter = 'todos' | 'hoje' | 'esta_semana' | 'este_mes';
+type ViewMode = 'kanban' | 'lista';
 
 export default function Atividades() {
   const [searchTerm, setSearchTerm] = useState("");
   const [prioridade, setPrioridade] = useState<PrioridadeFilter>('todas');
   const [periodo, setPeriodo] = useState<PeriodoFilter>('todos');
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
   const [filters, setFilters] = useState({
     produto: null as string | null,
     funil: null as string | null,
@@ -46,16 +52,46 @@ export default function Atividades() {
       <Header />
       <div className="container mx-auto px-4 py-6">
         <div className="mb-6">
-          <div className="flex items-center gap-4 mb-4">
-            <Link to="/">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Voltar
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold">Painel de Atividades</h1>
-              <p className="text-sm text-muted-foreground">Acompanhe cards com prazos definidos</p>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-4">
+              <Link to="/">
+                <Button variant="ghost" size="sm">
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Voltar
+                </Button>
+              </Link>
+              <div>
+                <h1 className="text-2xl font-bold">Painel de Atividades</h1>
+                <p className="text-sm text-muted-foreground">Acompanhe cards com prazos definidos</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="mostrar-concluidas"
+                  checked={mostrarConcluidas}
+                  onCheckedChange={setMostrarConcluidas}
+                />
+                <Label htmlFor="mostrar-concluidas">Mostrar concluídas</Label>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  variant={viewMode === 'kanban' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('kanban')}
+                >
+                  <LayoutGrid className="h-4 w-4 mr-2" />
+                  Kanban
+                </Button>
+                <Button
+                  variant={viewMode === 'lista' ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setViewMode('lista')}
+                >
+                  <LayoutList className="h-4 w-4 mr-2" />
+                  Lista
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -139,13 +175,21 @@ export default function Atividades() {
             </Select>
           </div>
         </div>
-
-        <AtividadesKanban 
-          filters={filters} 
-          searchTerm={searchTerm}
-          prioridade={prioridade}
-          periodo={periodo}
-        />
+        
+        {viewMode === 'kanban' ? (
+          <AtividadesKanban
+            filters={filters}
+            searchTerm={searchTerm}
+            prioridade={prioridade}
+            periodo={periodo}
+          />
+        ) : (
+          <AtividadesLista
+            filters={filters}
+            searchTerm={searchTerm}
+            mostrarConcluidas={mostrarConcluidas}
+          />
+        )}
       </div>
     </div>
   );
