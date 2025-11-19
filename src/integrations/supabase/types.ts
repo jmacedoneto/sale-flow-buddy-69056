@@ -757,6 +757,7 @@ export type Database = {
           mover_etapa: boolean | null
           nome: string | null
           role: string | null
+          status: string | null
           updated_at: string | null
           ver_relatorios: boolean | null
         }
@@ -775,6 +776,7 @@ export type Database = {
           mover_etapa?: boolean | null
           nome?: string | null
           role?: string | null
+          status?: string | null
           updated_at?: string | null
           ver_relatorios?: boolean | null
         }
@@ -793,6 +795,7 @@ export type Database = {
           mover_etapa?: boolean | null
           nome?: string | null
           role?: string | null
+          status?: string | null
           updated_at?: string | null
           ver_relatorios?: boolean | null
         }

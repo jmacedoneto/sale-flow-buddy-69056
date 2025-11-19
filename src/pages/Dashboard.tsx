@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, TestTube2, RefreshCw, Settings } from "lucide-react";
+import { DashboardAgendaWidget } from "@/components/DashboardAgendaWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSearchParams, Link } from "react-router-dom";
@@ -53,7 +54,20 @@ const Dashboard = () => {
   
   const { data: funis, isLoading: isLoadingFunis } = useFunis();
   const { data: etapas, isLoading: isLoadingEtapas } = useEtapas(selectedFunilId);
-  const { data: cardsData, isLoading: isLoadingCards } = useAllCardsForFunil(selectedFunilId, currentPage, pageSize);
+  
+  // GRUPO A.1: Passar filtros para o hook
+  const { data: cardsData, isLoading: isLoadingCards } = useAllCardsForFunil(
+    selectedFunilId, 
+    currentPage, 
+    pageSize,
+    {
+      status: filters.status,
+      leadName: filters.leadName,
+      productId: filters.productId,
+      openedFrom: filters.openedFrom,
+      openedTo: filters.openedTo,
+    }
+  );
   const allCards = cardsData?.cards;
   const totalCards = cardsData?.totalCount || 0;
   const totalPages = Math.ceil(totalCards / pageSize);
@@ -399,7 +413,11 @@ const Dashboard = () => {
               <p className="text-sm text-muted-foreground mt-1">
                 Visualização Kanban dos Funis
               </p>
+            {/* GRUPO C.3: Widget de Agenda */}
+            <div className="col-span-full lg:col-span-1">
+              <DashboardAgendaWidget />
             </div>
+          </div>
             <div className="flex items-center gap-3">
               <Link to="/dashboard-comercial">
                 <Button variant="outline" size="sm" className="gap-2">

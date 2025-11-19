@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useCardStatus } from "@/hooks/useCardStatus";
 import {
   Dialog,
   DialogContent,
@@ -17,23 +18,36 @@ import * as motivosPerdaService from "@/services/motivosPerdaService";
 interface ModalMotivoPerdaProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (motivoId: string, observacao?: string) => void;
+  cardId: string;
+  funilId?: string;
+  onConfirm?: () => void;
 }
 
-export const ModalMotivoPerda = ({ open, onOpenChange, onConfirm }: ModalMotivoPerdaProps) => {
+export const ModalMotivoPerda = ({ open, onOpenChange, cardId, funilId, onConfirm }: ModalMotivoPerdaProps) => {
   const [motivoId, setMotivoId] = useState("");
   const [observacao, setObservacao] = useState("");
+  const updateStatus = useCardStatus();
 
   const { data: motivos } = useQuery({
     queryKey: ["motivos-perda"],
     queryFn: () => motivosPerdaService.listarMotivosPerda(true),
   });
 
-  const handleConfirm = () => {
+  // GRUPO A.3: Usar useCardStatus unificado
+  const handleConfirm = async () => {
     if (!motivoId) return;
-    onConfirm(motivoId, observacao.trim() || undefined);
+    
+    await updateStatus.mutateAsync({
+      cardId,
+      status: 'perdido',
+      motivo: motivoId,
+      funilId,
+    });
+    
     setMotivoId("");
     setObservacao("");
+    onOpenChange(false);
+    onConfirm?.();
   };
 
   return (
@@ -79,8 +93,12 @@ export const ModalMotivoPerda = ({ open, onOpenChange, onConfirm }: ModalMotivoP
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button onClick={handleConfirm} disabled={!motivoId} variant="destructive">
-            Confirmar Perda
+          <Button 
+            onClick={handleConfirm} 
+            disabled={!motivoId || updateStatus.isPending} 
+            variant="destructive"
+          >
+            {updateStatus.isPending ? "Processando..." : "Confirmar Perda"}
           </Button>
         </DialogFooter>
       </DialogContent>

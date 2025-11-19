@@ -64,38 +64,62 @@ export interface CardWithStatus extends CardConversa {
   statusInfo: StatusInfo;
 }
 
-export const useAllCardsForFunil = (funilId: string | null, page: number = 0, pageSize: number = 50) => {
+export const useAllCardsForFunil = (
+  funilId: string | null, 
+  page: number = 0, 
+  pageSize: number = 50,
+  filters?: {
+    status?: string;
+    leadName?: string;
+    productId?: string | null;
+    openedFrom?: string | null;
+    openedTo?: string | null;
+  }
+) => {
   return useQuery<{ cards: CardWithStatus[]; totalCount: number }>({
-    queryKey: ["all_cards", funilId, page],
+    queryKey: ["all_cards", funilId, page, filters],
     queryFn: async () => {
       if (!funilId) return { cards: [], totalCount: 0 };
       
-      // Buscar total count
-      const { count } = await supabase
+      // GRUPO A.1 + A.2: Query com filtros e exclusão de arquivados
+      let query = supabase
         .from("cards_conversas")
-        .select(`
-          *,
-          etapas!inner (
-            funil_id
-          )
-        `, { count: 'exact', head: true })
-        .eq("etapas.funil_id", funilId);
+        .select('*', { count: 'exact' })
+        .eq('funil_id', funilId)
+        .eq('arquivado', false);
       
-      // Buscar dados paginados
+      // A.1: Filtro de status da oportunidade
+      if (filters?.status && filters.status !== 'todos') {
+        if (filters.status === 'ativo') {
+          query = query.eq('status', 'em_andamento').eq('pausado', false);
+        } else if (filters.status === 'pausado') {
+          query = query.eq('pausado', true);
+        } else if (filters.status === 'perdido') {
+          query = query.eq('status', 'perdido');
+        } else if (filters.status === 'ganho') {
+          query = query.eq('status', 'ganho');
+        }
+      }
+      
+      // A.1: Filtro de nome do lead
+      if (filters?.leadName) {
+        query = query.ilike('titulo', `%${filters.leadName}%`);
+      }
+      
+      // A.1: Filtro de data de abertura
+      if (filters?.openedFrom) {
+        query = query.gte('created_at', filters.openedFrom);
+      }
+      if (filters?.openedTo) {
+        query = query.lte('created_at', filters.openedTo);
+      }
+      
+      // Paginação
       const start = page * pageSize;
       const end = start + pageSize - 1;
+      query = query.range(start, end).order("created_at", { ascending: false });
       
-      const { data, error } = await (supabase as any)
-        .from("cards_conversas")
-        .select(`
-          *,
-          etapas!inner (
-            funil_id
-          )
-        `)
-        .eq("etapas.funil_id", funilId)
-        .order("created_at", { ascending: false })
-        .range(start, end);
+      const { data, error, count } = await query;
       
       if (error) throw error;
       
@@ -105,25 +129,14 @@ export const useAllCardsForFunil = (funilId: string | null, page: number = 0, pa
         statusInfo: computarStatusTarefa(card.data_retorno)
       } as CardWithStatus));
 
-      // P1.1: Log de debug (apenas em desenvolvimento)
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[useAllCardsForFunil]', {
-          funilId,
-          page,
-          totalCount: count,
-          cardsRetornados: cardsComStatus.length,
-          primeiroCardId: cardsComStatus[0]?.id,
-        });
-      }
-
       return {
         cards: cardsComStatus,
         totalCount: count || 0
       };
     },
     enabled: !!funilId,
-    refetchInterval: 10000, // P1.1: Auto-atualização a cada 10 segundos
-    staleTime: 5000, // P1.1: Considerar dados frescos por 5 segundos
+    refetchInterval: 10000,
+    staleTime: 5000,
   });
 };
 

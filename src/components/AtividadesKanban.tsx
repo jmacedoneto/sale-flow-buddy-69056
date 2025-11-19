@@ -41,7 +41,7 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
   const queryClient = useQueryClient();
   
   const { data: atividades = [], isLoading, refetch } = useQuery({
-    queryKey: ['atividades-kanban', filters, mostrarConcluidas],
+    queryKey: ['atividades-kanban', filters, mostrarConcluidas, prioridade, periodo],
     queryFn: async () => {
       let query = supabase
         .from('atividades_cards')
@@ -52,6 +52,7 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
             titulo,
             funil_id,
             chatwoot_conversa_id,
+            prioridade,
             funis(nome)
           )
         `)
@@ -68,6 +69,11 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
 
       if (filters.funil) {
         query = query.eq('cards_conversas.funil_id', filters.funil);
+      }
+      
+      // GRUPO C.2: Filtro de prioridade
+      if (prioridade !== 'todas') {
+        query = query.eq('cards_conversas.prioridade', prioridade);
       }
 
       const { data, error } = await query;
@@ -145,6 +151,7 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
     }
   };
 
+  // GRUPO C.1: Card com drag-and-drop
   const renderCard = (atividade: any) => {
     const dataPrevista = atividade.data_prevista ? new Date(atividade.data_prevista) : null;
     const diasDiferenca = dataPrevista ? differenceInDays(dataPrevista, hoje) : 0;

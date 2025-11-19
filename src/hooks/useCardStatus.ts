@@ -7,7 +7,7 @@ export type CardStatus = 'ganho' | 'perdido';
 interface UpdateCardStatusParams {
   cardId: string;
   status: CardStatus;
-  motivo: string;
+  motivo: string;  // motivo_perda_id ou texto descritivo para ganho
   funilId?: string;
 }
 
@@ -16,19 +16,20 @@ export const useCardStatus = () => {
 
   return useMutation({
     mutationFn: async ({ cardId, status, motivo, funilId }: UpdateCardStatusParams) => {
-      // 1. Atualizar status e arquivar do funil ativo
+      // GRUPO A.2: Atualizar status e arquivar do funil ativo
       const { error: updateError } = await supabase
         .from('cards_conversas')
         .update({
           status,
           arquivado: true,
           pausado: false,
+          motivo_perda_id: status === 'perdido' ? motivo : null,
         })
         .eq('id', cardId);
 
       if (updateError) throw updateError;
 
-      // 2. Registrar na tabela apropriada
+      // GRUPO A.2: Registrar na tabela apropriada
       const tableName = status === 'ganho' ? 'cards_ganhos' : 'cards_perdidos';
       const { error: insertError } = await supabase
         .from(tableName)
