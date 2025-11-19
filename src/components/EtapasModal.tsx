@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -154,9 +154,9 @@ export function EtapasModal({ open, onOpenChange, funilId, etapas = [] }: Etapas
   );
 
   // Update ordered etapas when etapas prop changes
-  useState(() => {
+  useEffect(() => {
     setOrderedEtapas(etapas);
-  });
+  }, [etapas]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;

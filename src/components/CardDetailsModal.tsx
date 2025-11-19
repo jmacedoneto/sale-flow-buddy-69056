@@ -70,25 +70,22 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
       setFunilId(card.funil_id || "");
       setEtapaId(card.etapa_id || "");
       
-      // Gerar resumo comercial automaticamente se não existir
-      if (!card.resumo_comercial && card.chatwoot_conversa_id) {
-        handleGerarResumo();
-      }
+      // Não gera mais automaticamente - só quando o usuário clicar no botão
     }
   }, [card]);
 
-  // Autosave para título com debounce
+  // Autosave para título
   useEffect(() => {
-    if (!card) return;
+    if (!card || !titulo) return;
     const timeoutId = setTimeout(() => {
-      if (titulo.trim() !== (card.titulo || '').trim()) {
+      if (titulo.trim() && titulo.trim() !== (card.titulo || '').trim()) {
         updateCard.mutate({ id: card.id, updates: { titulo: titulo.trim() } });
       }
     }, 500);
     return () => clearTimeout(timeoutId);
-  }, [titulo, card]);
+  }, [titulo, card?.id]);
 
-  // Autosave para descrição com debounce
+  // Autosave para descrição
   useEffect(() => {
     if (!card) return;
     const timeoutId = setTimeout(() => {
@@ -350,6 +347,22 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     );
   };
 
+  const handleSyncFromChatwoot = async () => {
+    if (!card?.chatwoot_conversa_id) {
+      toast.error("Card não possui conversa do Chatwoot vinculada");
+      return;
+    }
+
+    syncMutation.mutate(
+      { cardId: card.id, conversationId: card.chatwoot_conversa_id },
+      {
+        onSuccess: () => {
+          // As atividades serão recarregadas automaticamente pelo hook
+        },
+      }
+    );
+  };
+
   if (!card) return null;
 
   const chatwootUrl = config?.url && card.chatwoot_conversa_id 
@@ -386,6 +399,17 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
               </div>
             </div>
             <div className="flex gap-2 shrink-0">
+              {card.chatwoot_conversa_id && (
+                <Button
+                  onClick={handleSyncFromChatwoot}
+                  variant="outline"
+                  size="sm"
+                  disabled={syncMutation.isPending}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-1 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
+                  Atualizar do Chatwoot
+                </Button>
+              )}
               <Button onClick={handleMarcarGanho} variant="default" size="sm" className="bg-success hover:bg-success/90">
                 <Trophy className="h-4 w-4 mr-1" />
                 Ganhou
