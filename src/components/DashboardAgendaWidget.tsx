@@ -57,70 +57,67 @@ export const DashboardAgendaWidget = () => {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5" />
-          Minha Agenda
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {/* Resumo */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="text-center p-3 bg-destructive/10 rounded-lg">
-            <div className="text-2xl font-bold text-destructive">{vencidas.length}</div>
-            <div className="text-xs text-muted-foreground">Vencidas</div>
+    <Card className="w-full">
+      <CardContent className="p-4">
+        <div className="flex items-center gap-6">
+          {/* Título compacto */}
+          <div className="flex items-center gap-2 shrink-0">
+            <Clock className="h-4 w-4" />
+            <span className="text-sm font-semibold">Minha Agenda</span>
           </div>
-          <div className="text-center p-3 bg-yellow-500/10 rounded-lg">
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-500">{deHoje.length}</div>
-            <div className="text-xs text-muted-foreground">Hoje</div>
-          </div>
-          <div className="text-center p-3 bg-primary/10 rounded-lg">
-            <div className="text-2xl font-bold text-primary">{proximasDias.length}</div>
-            <div className="text-xs text-muted-foreground">Próximas</div>
-          </div>
-        </div>
 
-        {/* Lista das 5 próximas */}
-        {atividades.length > 0 ? (
-          <div className="space-y-2">
-            <h4 className="text-sm font-medium">Próximas Atividades</h4>
-            {atividades.slice(0, 5).map(atividade => {
-              const dataPrevista = atividade.data_prevista ? new Date(atividade.data_prevista) : null;
-              const isVencida = dataPrevista && isBefore(startOfDay(dataPrevista), hoje);
-              const isHoje = dataPrevista && isToday(dataPrevista);
-              const isAmanha = dataPrevista && isTomorrow(dataPrevista);
+          {/* Resumo horizontal compacto */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 rounded-md">
+              <span className="text-lg font-bold text-destructive">{vencidas.length}</span>
+              <span className="text-xs text-muted-foreground">Vencidas</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 rounded-md">
+              <span className="text-lg font-bold text-yellow-600 dark:text-yellow-500">{deHoje.length}</span>
+              <span className="text-xs text-muted-foreground">Hoje</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-md">
+              <span className="text-lg font-bold text-primary">{proximasDias.length}</span>
+              <span className="text-xs text-muted-foreground">Próximas</span>
+            </div>
+          </div>
 
-              return (
-                <div key={atividade.id} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{atividade.cards_conversas?.titulo}</p>
-                    <p className="text-xs text-muted-foreground truncate">{atividade.descricao}</p>
+          {/* Próximas atividades em linha */}
+          {atividades.length > 0 ? (
+            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto">
+              {atividades.slice(0, 3).map(atividade => {
+                const dataPrevista = atividade.data_prevista ? new Date(atividade.data_prevista) : null;
+                const isVencida = dataPrevista && isBefore(startOfDay(dataPrevista), hoje);
+                const isHoje = dataPrevista && isToday(dataPrevista);
+                const isAmanha = dataPrevista && isTomorrow(dataPrevista);
+
+                return (
+                  <div key={atividade.id} className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md shrink-0">
+                    <div className="flex flex-col min-w-0">
+                      <p className="text-xs font-medium truncate max-w-[150px]">{atividade.cards_conversas?.titulo}</p>
+                    </div>
+                    <Badge 
+                      variant={isVencida ? "destructive" : isHoje ? "default" : "secondary"}
+                      className="text-xs shrink-0"
+                    >
+                      {isVencida ? "Vencida" : isHoje ? "Hoje" : isAmanha ? "Amanhã" : dataPrevista ? format(dataPrevista, "dd/MM", { locale: ptBR }) : ""}
+                    </Badge>
                   </div>
-                  <Badge 
-                    variant={isVencida ? "destructive" : isHoje ? "default" : "secondary"}
-                    className="ml-2 shrink-0"
-                  >
-                    {isVencida ? "Vencida" : isHoje ? "Hoje" : isAmanha ? "Amanhã" : 
-                      dataPrevista ? format(dataPrevista, "dd/MM", { locale: ptBR }) : "-"}
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="text-sm text-muted-foreground text-center py-4">
-            Nenhuma atividade pendente
-          </p>
-        )}
+                );
+              })}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground flex-1">Nenhuma atividade pendente</p>
+          )}
 
-        {/* Link para página completa */}
-        <Link to="/atividades">
-          <Button variant="outline" className="w-full">
-            Ver todas as atividades
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        </Link>
+          {/* Link para ver todas */}
+          <Link to="/atividades" className="shrink-0">
+            <Button variant="ghost" size="sm" className="gap-1">
+              Ver todas
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
