@@ -16,19 +16,19 @@ export const useCardStatus = () => {
 
   return useMutation({
     mutationFn: async ({ cardId, status, motivo, funilId }: UpdateCardStatusParams) => {
-      // 1. Arquivar card do funil ativo
+      // 1. Atualizar status e arquivar do funil ativo
       const { error: updateError } = await supabase
         .from('cards_conversas')
         .update({
           status,
           arquivado: true,
-          pausado: status === 'perdido' ? false : undefined,
+          pausado: false,
         })
         .eq('id', cardId);
 
       if (updateError) throw updateError;
 
-      // 2. Mover para tabela apropriada
+      // 2. Registrar na tabela apropriada
       const tableName = status === 'ganho' ? 'cards_ganhos' : 'cards_perdidos';
       const { error: insertError } = await supabase
         .from(tableName)
@@ -45,8 +45,9 @@ export const useCardStatus = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['cards'] });
+      queryClient.invalidateQueries({ queryKey: ['all_cards'] });
       queryClient.invalidateQueries({ queryKey: ['pipeline'] });
-      toast.success(`Card marcado como ${variables.status.toUpperCase()}`);
+      toast.success(`Card marcado como ${variables.status === 'ganho' ? 'GANHO' : 'PERDIDO'}`);
     },
     onError: (error: any) => {
       console.error('Erro ao atualizar status do card:', error);

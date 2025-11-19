@@ -328,22 +328,27 @@ export const useCreateFunil = () => {
   
   return useMutation({
     mutationFn: async ({ nome }: { nome: string }) => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("funis")
         .insert({ nome })
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao criar funil:', error);
+        throw new Error(error.message || 'Erro ao criar funil');
+      }
+      
       return data as Funil;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["funis"] });
       toast.success("Funil criado com sucesso!");
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Erro ao criar funil:", error);
-      toast.error("Erro ao criar funil. Tente novamente.");
+      const message = error?.message || "Erro ao criar funil";
+      toast.error(message);
     },
   });
 };

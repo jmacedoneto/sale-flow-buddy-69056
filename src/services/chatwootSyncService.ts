@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from 'sonner';
 
 export interface SyncChatwootPayload {
   conversation_id: number;
@@ -36,4 +37,62 @@ export const syncOptionsWithChatwoot = async (): Promise<SyncOptionsResponse> =>
   
   if (error) throw error;
   return data;
+};
+
+/**
+ * Sincroniza card a partir do Chatwoot (puxar dados)
+ */
+export const syncCardFromChatwoot = async (
+  cardId: string,
+  conversationId: number
+): Promise<boolean> => {
+  try {
+    console.log('[Chatwoot Sync] Sincronizando card:', cardId, 'conv:', conversationId);
+
+    const { data, error } = await supabase.functions.invoke('sync-chatwoot-completo', {
+      body: { conversation_id: conversationId, card_id: cardId }
+    });
+
+    if (error) throw error;
+
+    // Verificar se temos atributos customizados
+    const customAttributes = data?.custom_attributes;
+    
+    if (customAttributes) {
+      // Atualizar atributo agendar_followup se existir
+      if (customAttributes.agendar_followup) {
+        // Criar/atualizar atividade de follow-up
+        const followupText = customAttributes.agendar_followup;
+        const dataRetorno = customAttributes.data_retorno 
+          ? new Date(customAttributes.data_retorno)
+          : new Date(Date.now() + 7 * 86400000); // 7 dias padrão
+
+        await supabase.from('atividades_cards').upsert({
+          card_id: cardId,
+          tipo: 'Ligação', // Tipo padrão
+          descricao: followupText,
+          data_prevista: dataRetorno.toISOString(),
+          status: 'pendente',
+        }, {
+          onConflict: 'card_id,tipo,data_prevista',
+        });
+
+        toast.success('Follow-up sincronizado do Chatwoot!');
+      }
+
+      // Atualizar tags/funil se houver
+      if (data.tags) {
+        console.log('[Chatwoot Sync] Tags:', data.tags);
+      }
+
+      return true;
+    }
+
+    toast.success('Card atualizado do Chatwoot!');
+    return true;
+  } catch (error) {
+    console.error('[Chatwoot Sync] Erro:', error);
+    toast.error('Erro ao sincronizar com Chatwoot');
+    return false;
+  }
 };

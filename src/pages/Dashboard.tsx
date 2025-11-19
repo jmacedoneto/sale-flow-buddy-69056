@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, TestTube2, RefreshCw } from "lucide-react";
+import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, TestTube2, RefreshCw, Settings } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useSearchParams, Link } from "react-router-dom";
@@ -28,6 +28,7 @@ import { EtapasModal } from "@/components/EtapasModal";
 import type { Funil } from "@/types/database";
 import { usePipelineFilters } from "@/utils/pipelineFilters";
 import { PipelineFilters } from "@/components/PipelineFilters";
+import { DashboardResumo } from "@/components/DashboardResumo";
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
