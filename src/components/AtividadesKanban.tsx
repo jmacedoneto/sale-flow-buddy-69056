@@ -3,11 +3,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { AtividadeCard } from '@/types/database';
 import { Clock, User, Phone, Mail } from 'lucide-react';
-import { format, addDays, isToday, isTomorrow, isBefore, isAfter } from 'date-fns';
+import { format, addDays, isToday, isTomorrow, isBefore, isAfter, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useKanbanColors } from '@/hooks/useKanbanColors';
 import { useState } from 'react';
-import { AtividadeRetornoModal } from './AtividadeRetornoModal';
+import { AtividadeDetailsModal } from './AtividadeDetailsModal';
 
 interface AtividadesKanbanProps {
   filters: {
@@ -34,8 +34,10 @@ const getActivityIcon = (tipo: string) => {
 export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: AtividadesKanbanProps) => {
   const { colors } = useKanbanColors();
   const [selectedAtividade, setSelectedAtividade] = useState<any | null>(null);
-  const { data: atividades = [], isLoading } = useQuery({
-    queryKey: ['atividades-kanban', filters],
+  const [mostrarConcluidas, setMostrarConcluidas] = useState(false);
+  
+  const { data: atividades = [], isLoading, refetch } = useQuery({
+    queryKey: ['atividades-kanban', filters, mostrarConcluidas],
     queryFn: async () => {
       let query = supabase
         .from('atividades_cards')
@@ -45,28 +47,48 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
             id,
             titulo,
             funil_id,
+            chatwoot_conversa_id,
             funis(nome)
           )
         `)
-        .eq('status', 'pendente')
         .not('data_prevista', 'is', null)
         .order('data_prevista', { ascending: true });
+
+      if (!mostrarConcluidas) {
+        query = query.eq('status', 'pendente');
+      }
 
       if (filters.usuario) {
         query = query.eq('user_id', filters.usuario);
       }
 
+      if (filters.funil) {
+        query = query.eq('cards_conversas.funil_id', filters.funil);
+      }
+
       const { data, error } = await query;
       if (error) throw error;
-      return data;
+      
+      // Filtrar por searchTerm se fornecido
+      let filtered = data;
+      if (searchTerm) {
+        filtered = data.filter(a => 
+          a.descricao?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          a.cards_conversas?.titulo?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+      }
+      
+      return filtered;
     },
   });
 
   const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
   const amanha = addDays(hoje, 1);
   const seteDias = addDays(hoje, 7);
 
   const colunas = {
+    vencidas: atividades.filter((a) => a.data_prevista && isBefore(new Date(a.data_prevista), hoje)),
     hoje: atividades.filter((a) => a.data_prevista && isToday(new Date(a.data_prevista))),
     amanha: atividades.filter((a) => a.data_prevista && isTomorrow(new Date(a.data_prevista))),
     proxima: atividades.filter(
@@ -77,31 +99,43 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
     ),
   };
 
-  const renderCard = (atividade: any) => (
-    <Card
-      key={atividade.id}
-      className="mb-3 cursor-pointer hover:shadow-md transition-shadow"
-      onClick={() => setSelectedAtividade(atividade)}
-    >
-      <CardContent className="p-4">
-        <div className="flex items-start gap-2">
-          <div className="mt-1">{getActivityIcon(atividade.tipo)}</div>
-          <div className="flex-1">
-            <p className="font-medium text-sm">{atividade.cards_conversas?.titulo || 'Sem título'}</p>
-            <p className="text-xs text-muted-foreground mt-1">{atividade.descricao}</p>
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs bg-secondary px-2 py-1 rounded">{atividade.tipo}</span>
-              {atividade.data_prevista && (
-                <span className="text-xs text-muted-foreground">
-                  {format(new Date(atividade.data_prevista), 'HH:mm', { locale: ptBR })}
-                </span>
-              )}
+  const renderCard = (atividade: any) => {
+    const dataPrevista = atividade.data_prevista ? new Date(atividade.data_prevista) : null;
+    const diasDiferenca = dataPrevista ? differenceInDays(dataPrevista, hoje) : 0;
+    const isVencida = diasDiferenca < 0;
+    const cor = isVencida ? "border-red-500" : diasDiferenca === 0 ? "border-yellow-500" : "border-green-500";
+
+    return (
+      <Card
+        key={atividade.id}
+        className={`mb-3 cursor-pointer hover:shadow-md transition-shadow ${cor} border-l-4`}
+        onClick={() => setSelectedAtividade(atividade)}
+      >
+        <CardContent className="p-4">
+          <div className="flex items-start gap-2">
+            <div className="mt-1">{getActivityIcon(atividade.tipo)}</div>
+            <div className="flex-1">
+              <p className="font-medium text-sm">{atividade.cards_conversas?.titulo || 'Sem título'}</p>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{atividade.descricao}</p>
+              <div className="flex items-center gap-2 mt-2 flex-wrap">
+                <span className="text-xs bg-secondary px-2 py-1 rounded">{atividade.tipo}</span>
+                {atividade.data_prevista && (
+                  <span className="text-xs text-muted-foreground">
+                    {format(new Date(atividade.data_prevista), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                  </span>
+                )}
+                {isVencida && (
+                  <span className="text-xs text-red-600 font-medium">
+                    Vencida há {Math.abs(diasDiferenca)} dia(s)
+                  </span>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (isLoading) {
     return <div className="p-4">Carregando atividades...</div>;

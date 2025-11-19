@@ -59,10 +59,10 @@ export const syncCardFromChatwoot = async (
     const customAttributes = data?.custom_attributes;
     
     if (customAttributes) {
-      // Atualizar atributo agendar_followup se existir
-      if (customAttributes.agendar_followup) {
+      // Atualizar atributo agendar_foilowup se existir (nome exato do atributo)
+      if (customAttributes.agendar_foilowup) {
         // Criar/atualizar atividade de follow-up
-        const followupText = customAttributes.agendar_followup;
+        const followupText = customAttributes.agendar_foilowup;
         const dataRetorno = customAttributes.data_retorno 
           ? new Date(customAttributes.data_retorno)
           : new Date(Date.now() + 7 * 86400000); // 7 dias padrão
