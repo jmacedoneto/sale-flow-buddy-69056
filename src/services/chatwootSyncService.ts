@@ -61,23 +61,25 @@ export const syncCardFromChatwoot = async (
     if (customAttributes) {
       // Atualizar atributo agendar_foilowup se existir (nome exato do atributo)
       if (customAttributes.agendar_foilowup) {
-        // Criar/atualizar atividade de follow-up
+        // Criar atividade de follow-up
         const followupText = customAttributes.agendar_foilowup;
         const dataRetorno = customAttributes.data_retorno 
           ? new Date(customAttributes.data_retorno)
           : new Date(Date.now() + 7 * 86400000); // 7 dias padrão
 
-        await supabase.from('atividades_cards').upsert({
+        const { error: atividadeError } = await supabase.from('atividades_cards').insert({
           card_id: cardId,
           tipo: 'Ligação', // Tipo padrão
           descricao: followupText,
-          data_prevista: dataRetorno.toISOString(),
+          data_prevista: dataRetorno.toISOString().split('T')[0], // Apenas data
           status: 'pendente',
-        }, {
-          onConflict: 'card_id,tipo,data_prevista',
         });
 
-        toast.success('Follow-up sincronizado do Chatwoot!');
+        if (atividadeError) {
+          console.error('[Chatwoot Sync] Erro ao criar follow-up:', atividadeError);
+        } else {
+          toast.success('Follow-up sincronizado do Chatwoot!');
+        }
       }
 
       // Atualizar tags/funil se houver
