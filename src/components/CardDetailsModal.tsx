@@ -15,6 +15,8 @@ import { useState, useEffect } from "react";
 import type { CardConversa } from "@/types/database";
 import { useUpdateCard, useFunis, useEtapas } from "@/hooks/useFunis";
 import { useAtividades, useCreateAtividade } from "@/hooks/useAtividades";
+import { useSyncCardFromChatwoot } from "@/hooks/useSyncCardFromChatwoot";
+import { useAutosave } from "@/hooks/useAutosave";
 import { AtividadeTimeline } from "./AtividadeTimeline";
 import { ChatInbox } from "./chat/ChatInbox";
 import { toast } from "sonner";
@@ -26,8 +28,6 @@ import { ModalMotivoPerda } from "./ModalMotivoPerda";
 import { CardProdutosManager } from "./CardProdutosManager";
 import { useChatwootConfig } from "@/hooks/useChatwootConfig";
 import { RefreshCw } from "lucide-react";
-import { useAutosave } from "@/hooks/useAutosave";
-import { useSyncCardFromChatwoot } from "@/hooks/useSyncCardFromChatwoot";
 
 interface CardDetailsModalProps {
   card: CardConversa | null;
