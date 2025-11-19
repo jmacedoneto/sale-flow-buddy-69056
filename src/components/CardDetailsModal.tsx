@@ -25,6 +25,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { ModalMotivoPerda } from "./ModalMotivoPerda";
 import { CardProdutosManager } from "./CardProdutosManager";
 import { useChatwootConfig } from "@/hooks/useChatwootConfig";
+import { syncCardFromChatwoot } from "@/services/chatwootSyncService";
+import { RefreshCw } from "lucide-react";
 
 interface CardDetailsModalProps {
   card: CardConversa | null;
@@ -42,6 +44,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   const [etapaId, setEtapaId] = useState<string>("");
   const [isGeneratingResumo, setIsGeneratingResumo] = useState(false);
   const [modalPerdaOpen, setModalPerdaOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   // Follow-up form states
   const [followUpData, setFollowUpData] = useState<Date | undefined>(
