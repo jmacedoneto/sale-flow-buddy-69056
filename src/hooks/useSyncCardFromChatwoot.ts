@@ -13,10 +13,13 @@ export const useSyncCardFromChatwoot = () => {
       return await syncCardFromChatwoot(cardId, conversationId);
     },
     onSuccess: () => {
-      // Invalidar queries relevantes
+      // Invalidar TODAS as queries relevantes para garantir atualização imediata
       queryClient.invalidateQueries({ queryKey: ['cards'] });
+      queryClient.invalidateQueries({ queryKey: ['all_cards'] });
+      queryClient.invalidateQueries({ queryKey: ['cards_conversas'] });
       queryClient.invalidateQueries({ queryKey: ['atividades'] });
       queryClient.invalidateQueries({ queryKey: ['atividades-kanban'] });
+      queryClient.invalidateQueries({ queryKey: ['atividades-lista'] });
       toast.success('Card atualizado do Chatwoot!');
     },
     onError: (error: Error) => {
