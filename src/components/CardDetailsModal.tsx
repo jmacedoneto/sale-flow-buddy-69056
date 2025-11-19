@@ -74,38 +74,49 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     }
   }, [card]);
 
+  // GRUPO B.2: Autosave expandido para TODOS os campos relevantes
+  const { save: autosave, isSaving } = useAutosave({ 
+    cardId: card?.id || '', 
+    enabled: !!card,
+    debounceMs: 500 
+  });
+
+  // GRUPO B.3: Sync Chatwoot automático ao abrir (se > 5min desde último sync)
+  useEffect(() => {
+    if (!card?.chatwoot_conversa_id) return;
+    
+    const lastSync = card.updated_at ? new Date(card.updated_at).getTime() : 0;
+    const fiveMinutesAgo = Date.now() - (5 * 60 * 1000);
+    
+    if (lastSync < fiveMinutesAgo && !syncMutation.isPending) {
+      console.log('[CardDetails] Auto-sync Chatwoot (último sync > 5min)');
+      syncMutation.mutate({ cardId: card.id, conversationId: card.chatwoot_conversa_id });
+    }
+  }, [card?.id]);
+
   // Autosave para título
   useEffect(() => {
     if (!card || !titulo) return;
-    const timeoutId = setTimeout(() => {
-      if (titulo.trim() && titulo.trim() !== (card.titulo || '').trim()) {
-        updateCard.mutate({ id: card.id, updates: { titulo: titulo.trim() } });
-      }
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [titulo, card?.id]);
+    if (titulo.trim() && titulo.trim() !== (card.titulo || '').trim()) {
+      autosave({ titulo: titulo.trim() });
+    }
+  }, [titulo]);
 
   // Autosave para descrição
   useEffect(() => {
     if (!card) return;
-    const timeoutId = setTimeout(() => {
-      if (descricaoDetalhada.trim() !== (card.descricao_detalhada || '').trim()) {
-        updateCard.mutate({ id: card.id, updates: { descricao_detalhada: descricaoDetalhada.trim() || null } });
-      }
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [descricaoDetalhada, card]);
+    if (descricaoDetalhada.trim() !== (card.descricao_detalhada || '').trim()) {
+      autosave({ descricao_detalhada: descricaoDetalhada.trim() || null });
+    }
+  }, [descricaoDetalhada]);
 
-  // Autosave para prioridade com debounce
+  // Autosave para prioridade
   useEffect(() => {
     if (!card) return;
-    const timeoutId = setTimeout(() => {
-      if (prioridade !== (card.prioridade || '')) {
-        updateCard.mutate({ id: card.id, updates: { prioridade: prioridade || null } });
-      }
-    }, 500);
-    return () => clearTimeout(timeoutId);
-  }, [prioridade, card]);
+    if (prioridade !== (card.prioridade || '')) {
+      autosave({ prioridade: prioridade || null });
+    }
+  }, [prioridade]);
 
   const handleSave = async () => {
     if (!card) return;
@@ -285,46 +296,17 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     }
   };
 
-  const handleMarcarGanho = () => {
+  // GRUPO A.3: Handlers unificados para status
+  const handleGanhou = async () => {
     if (!card) return;
-    
-    updateCard.mutate(
-      {
-        id: card.id,
-        updates: { status: 'ganho' },
-      },
-      {
-        onSuccess: () => {
-          toast.success("Venda marcada como ganha! 🎉");
-          onOpenChange(false);
-        },
-      }
-    );
+    await updateCard.mutateAsync({ 
+      id: card.id, 
+      updates: { status: 'ganho', arquivado: true, pausado: false }
+    });
+    toast.success("Oportunidade marcada como GANHA! 🎉");
+    onOpenChange(false);
   };
 
-  const handleMarcarPerda = (motivoId: string, observacao?: string) => {
-    if (!card) return;
-    
-    updateCard.mutate(
-      {
-        id: card.id,
-        updates: {
-          status: 'perdido',
-          motivo_perda_id: motivoId,
-          descricao_detalhada: observacao
-            ? `${card.descricao_detalhada || ''}\n\nMotivo da perda: ${observacao}`.trim()
-            : card.descricao_detalhada,
-        },
-      },
-      {
-        onSuccess: () => {
-          toast.success("Venda marcada como perdida");
-          setModalPerdaOpen(false);
-          onOpenChange(false);
-        },
-      }
-    );
-  };
 
   const handlePausar = () => {
     if (!card) return;
@@ -410,7 +392,7 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                   Atualizar do Chatwoot
                 </Button>
               )}
-              <Button onClick={handleMarcarGanho} variant="default" size="sm" className="bg-success hover:bg-success/90">
+              <Button onClick={handleGanhou} variant="default" size="sm" className="bg-success hover:bg-success/90">
                 <Trophy className="h-4 w-4 mr-1" />
                 Ganhou
               </Button>
@@ -695,11 +677,13 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
         </div>
       </SheetContent>
 
-      {/* Modal de Perda */}
+      {/* GRUPO A.3: Modal de motivo de perda unificado */}
       <ModalMotivoPerda
         open={modalPerdaOpen}
         onOpenChange={setModalPerdaOpen}
-        onConfirm={handleMarcarPerda}
+        cardId={card?.id || ''}
+        funilId={card?.funil_id}
+        onConfirm={() => onOpenChange(false)}
       />
     </Sheet>
   );

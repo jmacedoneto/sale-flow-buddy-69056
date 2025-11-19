@@ -13,6 +13,8 @@ interface ChatwootWebhookPayload {
       nome_do_funil?: string;
       funil_etapa?: string;
       data_retorno?: string;
+      label?: string; // Backward compatibility
+      etapa_comercial?: string; // Backward compatibility
     };
   };
 }
