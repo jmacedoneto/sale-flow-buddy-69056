@@ -178,11 +178,11 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
         {/* Coluna PRÓXIMOS 7 DIAS */}
         <div>
           <div className="p-3 rounded-t-lg" style={{ backgroundColor: colors.proxima }}>
-            <h3 className="font-semibold text-white">PRÓXIMOS 7 DIAS ({colunas.proxima.length})</h3>
+            <h3 className="font-semibold text-white">PRÓXIMOS 7 DIAS ({colunas.estaSemana.length})</h3>
           </div>
           <div className="bg-muted/30 p-3 rounded-b-lg min-h-[400px]">
-            {colunas.proxima.map(renderCard)}
-            {colunas.proxima.length === 0 && (
+            {colunas.estaSemana.map(renderCard)}
+            {colunas.estaSemana.length === 0 && (
               <p className="text-sm text-muted-foreground text-center py-8">
                 Nenhuma atividade nos próximos dias
               </p>
