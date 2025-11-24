@@ -11,20 +11,12 @@ import { AbaMotivosPerda } from "@/components/AbaMotivosPerda";
 import { AbaKanbanColors } from "@/components/AbaKanbanColors";
 import { AbaFunis } from "@/components/AbaFunis";
 import { usePermissions } from "@/hooks/usePermissions";
-import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ShieldAlert } from "lucide-react";
 
 const Configuracoes = () => {
   const { isAdmin, loading } = usePermissions();
-  const navigate = useNavigate();
-
-  // Redirecionar não-admins
-  useEffect(() => {
-    if (!loading && !isAdmin) {
-      navigate('/dashboard');
-    }
-  }, [isAdmin, loading, navigate]);
 
   // Mostrar loading enquanto verifica permissões
   if (loading) {
@@ -38,9 +30,20 @@ const Configuracoes = () => {
     );
   }
 
-  // Não renderizar nada se não for admin
+  // Renderizar mensagem de acesso negado (sem redirecionamento)
   if (!isAdmin) {
-    return null;
+    return (
+      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
+        <Alert variant="destructive" className="max-w-md">
+          <ShieldAlert className="h-4 w-4" />
+          <AlertTitle>Acesso Negado</AlertTitle>
+          <AlertDescription>
+            Você não tem permissão para acessar as configurações do sistema.
+            Entre em contato com um administrador para solicitar acesso.
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
   }
 
   return (
