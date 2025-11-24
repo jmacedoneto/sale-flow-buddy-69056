@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
@@ -110,6 +111,23 @@ export const usePermissions = () => {
   const isManager = hasRole('manager');
   const isAgent = hasRole('agent');
   const isViewer = hasRole('viewer');
+
+  // Debug logging para monitoramento
+  useEffect(() => {
+    if (!loadingRoles && !loadingAccess) {
+      console.log('[usePermissions] Permissions loaded:', {
+        userId: user?.id,
+        email: user?.email,
+        roles,
+        isAdmin,
+        isManager,
+        isAgent,
+        isViewer,
+        allowedFunilIds,
+        editableFunilIds
+      });
+    }
+  }, [loadingRoles, loadingAccess, user?.id, user?.email, roles, isAdmin, isManager, isAgent, isViewer, allowedFunilIds, editableFunilIds]);
 
   return {
     roles,

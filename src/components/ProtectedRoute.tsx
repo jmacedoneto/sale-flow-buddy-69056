@@ -1,47 +1,17 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode } from "react";
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
+import { usePermissions } from "@/hooks/usePermissions";
 
 interface ProtectedRouteProps {
   children: ReactNode;
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { user, loading } = useAuth();
-  const [approved, setApproved] = useState<boolean | null>(null);
-  const [checkingApproval, setCheckingApproval] = useState(true);
+  const { user, loading: authLoading } = useAuth();
+  const { loading: permissionsLoading } = usePermissions();
 
-  useEffect(() => {
-    const checkApproval = async () => {
-      if (user) {
-        // Super admin bypass - libera acesso imediato
-        if (user.email === 'jmacedoneto1989@gmail.com') {
-          console.log('Super admin detected, bypassing approval check');
-          setApproved(true);
-          setCheckingApproval(false);
-          return;
-        }
-
-        const { data } = await supabase
-          .from('users_crm')
-          .select('approved, role')
-          .eq('id', user.id)
-          .maybeSingle();
-        
-        // Verifica se é master ou está aprovado
-        const isApproved = data?.approved === true || data?.role === 'master';
-        setApproved(isApproved);
-      }
-      setCheckingApproval(false);
-    };
-
-    if (!loading) {
-      checkApproval();
-    }
-  }, [user, loading]);
-
-  if (loading || checkingApproval) {
+  if (authLoading || permissionsLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -54,10 +24,6 @@ export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
 
   if (!user) {
     return <Navigate to="/auth" replace />;
-  }
-
-  if (approved === false) {
-    return <Navigate to="/pending" replace />;
   }
 
   return <>{children}</>;
