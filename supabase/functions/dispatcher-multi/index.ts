@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
   let conversationId: number | null = null;
   let eventType: string | null = null;
   let cardId: string | null = null;
+  let rawPayload: any = null;
 
   try {
     const url = new URL(req.url);
@@ -110,10 +111,16 @@ Deno.serve(async (req) => {
     console.log(`[dispatcher-multi] Webhook path: ${webhookPath}`);
     console.log(`[dispatcher-multi] Request method: ${req.method}`);
     console.log(`[dispatcher-multi] Full URL: ${req.url}`);
-    console.log(`[dispatcher-multi] Headers:`, Object.fromEntries(req.headers.entries()));
+    
+    const headersObj = Object.fromEntries(req.headers.entries());
+    console.log(`[dispatcher-multi] Headers:`, headersObj);
     
     const contentType = req.headers.get('content-type');
     console.log(`[dispatcher-multi] Content-Type: ${contentType}`);
+
+    // Detectar event type do header (Chatwoot envia isso)
+    const headerEventType = req.headers.get('X-Chatwoot-Event') || req.headers.get('x-chatwoot-event');
+    console.log(`[dispatcher-multi] Header Event Type: ${headerEventType}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -203,7 +210,7 @@ Deno.serve(async (req) => {
     
     console.log(`[dispatcher-multi] Webhook encontrado: ${webhookConfig.name} (strategy: ${matchStrategy})`)
 
-// Função para extrair conversation_id de múltiplos formatos
+    // Função para extrair conversation_id de múltiplos formatos
     function resolveConversationId(payload: any): number | null {
       return (
         payload.conversation_id ??
@@ -228,12 +235,22 @@ Deno.serve(async (req) => {
         
         if (rawBody && rawBody.trim().length > 0) {
           body = JSON.parse(rawBody);
+          rawPayload = body; // Guardar payload original para debug
+          
+          console.log(`[DEBUG] Raw payload received:`, JSON.stringify(body).substring(0, 1000));
+          
+          // Validar payload não vazio
+          if (!body || Object.keys(body).length === 0) {
+            throw new Error('Payload vazio recebido do Chatwoot');
+          }
           
           // Unwrap: se vier de proxy (webhook.site), o Chatwoot original está em receivedPayload
           payload = body.receivedPayload ?? body;
           payloadFormat = body.receivedPayload ? 'wrapped' : 'raw';
           
           console.log(`[dispatcher-multi] Payload parseado (format: ${payloadFormat})`);
+        } else {
+          console.error(`[dispatcher-multi] Body vazio recebido`);
         }
       } catch (e) {
         console.error(`[dispatcher-multi] Erro ao parsear JSON:`, e);
@@ -260,26 +277,51 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Normalização de Event Type - Chatwoot pode enviar em locais diferentes
+    eventType = headerEventType 
+      || payload?.event 
+      || payload?.event_type 
+      || payload?.message_type 
+      || 'unknown';
+    
+    console.log(`[dispatcher-multi] Event type normalizado: ${eventType}`);
+
     // Extrair conversation_id usando função robusta
+    // Para message_created, a estrutura pode ser diferente
+    const message = payload?.message || payload;
+    const conversation = payload?.conversation || message?.conversation;
+    
     conversationId = payload ? resolveConversationId(payload) : null;
+    
+    // Se não encontrou, tentar na conversation
+    if (!conversationId && conversation?.id) {
+      conversationId = conversation.id;
+    }
+
+    // Debug para conversação específica
+    if (conversationId === 3278) {
+      console.log(`[DEBUG] Conversação 3278 detectada:`, JSON.stringify(payload).substring(0, 2000));
+    }
 
     // Validar conversation_id
     if (!conversationId) {
       console.error(`[dispatcher-multi] Payload inválido: conversation_id ausente`);
-      console.log(`[dispatcher-multi] Payload recebido:`, JSON.stringify(payload));
+      console.log(`[dispatcher-multi] Payload recebido:`, JSON.stringify(payload).substring(0, 1000));
+      console.log(`[dispatcher-multi] Raw payload:`, JSON.stringify(rawPayload).substring(0, 1000));
       
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
         status: 'error',
-        event_type: payload?.event || 'unknown',
+        event_type: eventType || 'unknown',
         error_message: 'Payload inválido: conversation_id ausente',
         latency_ms: Date.now() - startTime,
         payload: {
           method,
           url: req.url,
           payload_format: payloadFormat,
-          headers: Object.fromEntries(req.headers.entries()),
+          headers: headersObj,
           receivedPayload: payload,
+          rawPayload: rawPayload,
         },
       });
 
@@ -292,13 +334,13 @@ Deno.serve(async (req) => {
             payloadFormat,
             hasPayload: !!payload,
             conversationId,
+            eventType,
           }
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    eventType = payload.event;
     const conv = payload.conversation || payload;
 
     // Extrair dados do contato
@@ -522,53 +564,115 @@ Deno.serve(async (req) => {
       );
     }
 
-    if (eventType === 'message_created' && payload.private === true) {
+    // Handler para message_created (mensagens públicas e privadas)
+    if (eventType === 'message_created') {
+      const messageContent = payload.content || payload.message?.content || '';
+      const isPrivate = payload.private === true || payload.message?.private === true;
+      const messageId = payload.id || payload.message?.id;
+      
+      console.log(`[dispatcher-multi] message_created - private: ${isPrivate}, messageId: ${messageId}, content: ${messageContent?.substring(0, 100)}`);
+      
+      // Buscar card existente
       const { data: cardExists } = await supabase
         .from('cards_conversas')
         .select('id')
         .eq('chatwoot_conversa_id', conversationId)
         .maybeSingle();
 
-      if (cardExists && payload.id) {
-        const { error: atividadeError } = await supabase
-          .from('atividades_cards')
-          .insert({
-            card_id: cardExists.id,
-            tipo: 'MENSAGEM_PRIVADA',
-            descricao: payload.content || 'Mensagem privada do Chatwoot',
-            chatwoot_message_id: payload.id,
-            privado: true
-          });
+      if (cardExists && messageId) {
+        // Processar mensagem privada como atividade
+        if (isPrivate) {
+          const { error: atividadeError } = await supabase
+            .from('atividades_cards')
+            .insert({
+              card_id: cardExists.id,
+              tipo: 'MENSAGEM_PRIVADA',
+              descricao: messageContent || 'Mensagem privada do Chatwoot',
+              chatwoot_message_id: messageId,
+              privado: true
+            });
 
-        if (!atividadeError || atividadeError.message.includes('duplicate')) {
-          await supabase.from('webhook_sync_logs').insert({
-            sync_type: 'chatwoot_to_lovable',
-            conversation_id: conversationId,
-            card_id: cardExists.id,
-            status: 'success',
-            event_type: 'message_created_private',
-            latency_ms: Date.now() - startTime,
-          });
+          if (!atividadeError || atividadeError.message?.includes('duplicate')) {
+            await supabase.from('webhook_sync_logs').insert({
+              sync_type: 'chatwoot_to_lovable',
+              conversation_id: conversationId,
+              card_id: cardExists.id,
+              status: 'success',
+              event_type: 'message_created_private',
+              latency_ms: Date.now() - startTime,
+              payload: { messageId, contentPreview: messageContent?.substring(0, 100) }
+            });
+          }
+
+          return new Response(
+            JSON.stringify({ success: true, message: 'Private message processed', card_id: cardExists.id }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
         }
+        
+        // Mensagem pública - apenas atualizar last_chatwoot_sync_at
+        await supabase
+          .from('cards_conversas')
+          .update({ last_chatwoot_sync_at: new Date().toISOString() })
+          .eq('id', cardExists.id);
+
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          conversation_id: conversationId,
+          card_id: cardExists.id,
+          status: 'success',
+          event_type: 'message_created_public',
+          latency_ms: Date.now() - startTime,
+          payload: { messageId, contentPreview: messageContent?.substring(0, 100) }
+        });
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Public message processed', card_id: cardExists.id }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
+      // Card não existe - logar e ignorar
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        conversation_id: conversationId,
+        status: 'warning',
+        event_type: 'message_created_no_card',
+        error_message: 'Mensagem recebida mas card não existe para esta conversa',
+        latency_ms: Date.now() - startTime,
+        payload: { messageId, isPrivate, contentPreview: messageContent?.substring(0, 100) }
+      });
+
       return new Response(
-        JSON.stringify({ success: true, message: 'Private message processed' }),
+        JSON.stringify({ success: true, message: 'Message ignored - no card exists' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Log detalhado para eventos não tratados
+    console.error(`[UNHANDLED] Event not processed:`, {
+      eventType,
+      conversationId,
+      payloadKeys: payload ? Object.keys(payload) : [],
+      headerEventType: req.headers.get('X-Chatwoot-Event'),
+    });
 
     await supabase.from('webhook_sync_logs').insert({
       sync_type: 'chatwoot_to_lovable',
       conversation_id: conversationId,
       status: 'warning',
       event_type: eventType,
-      error_message: 'Event type not handled',
+      error_message: `Event type '${eventType}' not handled`,
       latency_ms: Date.now() - startTime,
+      payload: {
+        eventType,
+        payloadKeys: payload ? Object.keys(payload) : [],
+        rawPayloadPreview: rawPayload ? JSON.stringify(rawPayload).substring(0, 500) : null,
+      }
     });
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Event ignored' }),
+      JSON.stringify({ success: true, message: 'Event ignored', eventType }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
