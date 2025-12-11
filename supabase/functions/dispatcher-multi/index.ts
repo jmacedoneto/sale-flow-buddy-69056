@@ -374,33 +374,67 @@ Deno.serve(async (req) => {
     // REGRA 1: Labels definem funil (SSOT)
     const { funilNome: labelFunil, etapaDefault: labelEtapa } = resolveFunilByLabel(labels, mappings);
 
-    if (!labelFunil) {
-      // Sem label mapeada → logar warning e não criar/atualizar card
+    let final_funil_nome = labelFunil;
+    let fallbackEtapa = labelEtapa;
+
+    // FALLBACK 1: webhook_path quando sem labels
+    if (!final_funil_nome && webhookPath) {
+      const pathMap: Record<string, { funil: string; etapa: string }> = {
+        'comercial_geral': { funil: 'Comercial', etapa: 'Contato Inicial' },
+        'suporte_associado': { funil: 'Suporte ADM Associado', etapa: 'Demanda Aberta' },
+        'eventos_colisao': { funil: 'Eventos Colisão', etapa: 'Demanda Aberta' },
+        'eventos_terceiros': { funil: 'Eventos Terceiros', etapa: 'Demanda Aberta' },
+        'suporte_consultor': { funil: 'Suporte ADM Consultor', etapa: 'Demanda Aberta' },
+      };
+      const pathKey = webhookPath.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+      const fb = pathMap[pathKey];
+      if (fb) {
+        final_funil_nome = fb.funil;
+        fallbackEtapa = fb.etapa;
+        console.log(`[dispatcher] FALLBACK 1: webhook_path "${webhookPath}" → Funil: ${fb.funil}`);
+      }
+    }
+
+    // FALLBACK 2: inbox_id da conversa
+    if (!final_funil_nome && conv.inbox_id) {
+      const { data: inboxConfig } = await supabase
+        .from('webhooks_config')
+        .select('name')
+        .eq('inbox_path', String(conv.inbox_id))
+        .maybeSingle();
+      
+      if (inboxConfig?.name) {
+        final_funil_nome = inboxConfig.name;
+        fallbackEtapa = 'Contato Inicial';
+        console.log(`[dispatcher] FALLBACK 2: inbox_id ${conv.inbox_id} → Funil: ${final_funil_nome}`);
+      }
+    }
+
+    // FALLBACK 3: default universal
+    if (!final_funil_nome) {
+      final_funil_nome = 'Comercial';
+      fallbackEtapa = 'Contato Inicial';
+      console.warn(`[dispatcher] FALLBACK 3: Usando default universal → Comercial/Contato Inicial`);
+      
+      // Log para rastreamento
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
         conversation_id: conversationId,
-        status: 'warning',
+        status: 'info',
         event_type: eventType,
-        error_message: 'Nenhuma label mapeada encontrada. Atributos sem label não definem funil.',
+        error_message: 'Usando fallback universal (sem labels/path mapping)',
         latency_ms: Date.now() - startTime,
-        payload: { labels, attrs: mergedAttrs, webhookPath },
+        payload: { labels, attrs: mergedAttrs, webhookPath, fallback: 'universal' },
       });
-
-      return new Response(
-        JSON.stringify({ success: true, message: 'No valid label mapping' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
     }
-
-    const final_funil_nome = labelFunil;
     const tipoFunil = resolveTipoFunil(final_funil_nome);
 
     // REGRA 2: Atributos refinam etapa (complementar)
     let final_etapa_nome = resolveEtapaPorAtributos(tipoFunil, mergedAttrs, mappings);
     
-    // Fallback: etapa default da label ou null
+    // Fallback: etapa do fallback ou labelEtapa
     if (!final_etapa_nome) {
-      final_etapa_nome = labelEtapa;
+      final_etapa_nome = fallbackEtapa || labelEtapa;
     }
 
     const dataRetornoFinal = resolveDataRetorno(mergedAttrs);
