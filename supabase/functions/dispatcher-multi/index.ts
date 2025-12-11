@@ -119,15 +119,64 @@ Deno.serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    const { data: webhookConfig, error: configError } = await supabase
+    // Tentar encontrar webhook com múltiplas estratégias
+    let webhookConfig = null;
+    let matchStrategy = 'exact';
+    
+    // Estratégia 1: Match exato
+    const { data: exactMatch } = await supabase
       .from('webhooks_config')
       .select('*')
       .eq('inbox_path', webhookPath)
       .eq('active', true)
       .maybeSingle();
+    
+    if (exactMatch) {
+      webhookConfig = exactMatch;
+      matchStrategy = 'exact';
+    }
+    
+    // Estratégia 2: Match parcial (último segmento)
+    if (!webhookConfig) {
+      const lastSegment = webhookPath.split('/').pop() || webhookPath;
+      const { data: partialMatch } = await supabase
+        .from('webhooks_config')
+        .select('*')
+        .eq('active', true);
+      
+      if (partialMatch) {
+        webhookConfig = partialMatch.find(w => 
+          w.inbox_path === lastSegment ||
+          w.inbox_path.endsWith(`/${lastSegment}`) ||
+          lastSegment.endsWith(w.inbox_path)
+        );
+        if (webhookConfig) matchStrategy = 'partial';
+      }
+    }
+    
+    // Estratégia 3: Match case-insensitive
+    if (!webhookConfig) {
+      const { data: allConfigs } = await supabase
+        .from('webhooks_config')
+        .select('*')
+        .eq('active', true);
+      
+      if (allConfigs) {
+        webhookConfig = allConfigs.find(w => 
+          w.inbox_path.toLowerCase() === webhookPath.toLowerCase()
+        );
+        if (webhookConfig) matchStrategy = 'case_insensitive';
+      }
+    }
 
-    if (configError || !webhookConfig) {
+    if (!webhookConfig) {
       console.error(`[dispatcher-multi] Webhook não encontrado para path: ${webhookPath}`);
+      
+      // Listar webhooks disponíveis para debug
+      const { data: availableWebhooks } = await supabase
+        .from('webhooks_config')
+        .select('inbox_path, name')
+        .eq('active', true);
       
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
@@ -135,17 +184,24 @@ Deno.serve(async (req) => {
         event_type: 'webhook_not_found',
         error_message: `Webhook não mapeado para path '${webhookPath}'. Verifique webhooks_config.inbox_path.`,
         latency_ms: Date.now() - startTime,
-        payload: { webhookPath, url: req.url },
+        payload: { 
+          webhookPath, 
+          url: req.url,
+          availableWebhooks: availableWebhooks?.map(w => w.inbox_path) || []
+        },
       });
 
       return new Response(
         JSON.stringify({ 
           error: 'Webhook não mapeado', 
-          details: `Path '${webhookPath}' não encontrado em webhooks_config` 
+          details: `Path '${webhookPath}' não encontrado em webhooks_config`,
+          hint: `Webhooks disponíveis: ${availableWebhooks?.map(w => w.inbox_path).join(', ') || 'nenhum'}`
         }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log(`[dispatcher-multi] Webhook encontrado: ${webhookConfig.name} (strategy: ${matchStrategy})`)
 
 // Função para extrair conversation_id de múltiplos formatos
     function resolveConversationId(payload: any): number | null {
@@ -245,10 +301,12 @@ Deno.serve(async (req) => {
     eventType = payload.event;
     const conv = payload.conversation || payload;
 
-    // Extrair nome do contato
+    // Extrair dados do contato
+    const contactId = payload.contact?.id || payload.meta?.sender?.id || null;
     const contactName = payload.contact?.name || 
                        payload.meta?.sender?.name || 
                        `Conversa Chatwoot #${conversationId}`;
+    const contactPhone = payload.contact?.phone_number || payload.meta?.sender?.phone_number || null;
 
     const { data: mappingsData } = await supabase
       .from('mappings_config')
@@ -385,7 +443,13 @@ Deno.serve(async (req) => {
         funil_etapa: final_etapa_nome,
         data_retorno: dataRetornoFinal,
         titulo: contactName,
+        last_chatwoot_sync_at: new Date().toISOString(),
       };
+      
+      // Adicionar telefone ao resumo se disponível
+      if (contactPhone) {
+        updateFields.resumo = `Tel: ${contactPhone}`;
+      }
 
       // Gravar etapa em resumo_comercial se for comercial
       if (tipoFunil === 'COMERCIAL' && final_etapa_nome) {
@@ -440,12 +504,15 @@ Deno.serve(async (req) => {
         latency_ms: Date.now() - startTime,
         payload: { 
           payload_format: payloadFormat,
+          match_strategy: matchStrategy,
           label: labels[0] || null,
           funil: final_funil_nome, 
           tipo: tipoFunil,
           etapa: final_etapa_nome, 
           dataRetorno: dataRetornoFinal,
-          contactName 
+          contactName,
+          contactId,
+          contactPhone
         },
       });
 
