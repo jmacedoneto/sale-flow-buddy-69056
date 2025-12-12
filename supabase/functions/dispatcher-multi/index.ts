@@ -192,9 +192,13 @@ Deno.serve(async (req) => {
         error_message: `Webhook não mapeado para path '${webhookPath}'. Verifique webhooks_config.inbox_path.`,
         latency_ms: Date.now() - startTime,
         payload: { 
-          webhookPath, 
-          url: req.url,
-          availableWebhooks: availableWebhooks?.map(w => w.inbox_path) || []
+          rawInput: rawPayload,
+          decisionContext: {
+            reason: 'Path do webhook não encontrado na configuração',
+            webhookPath, 
+            url: req.url,
+            availableWebhooks: availableWebhooks?.map(w => w.inbox_path) || []
+          }
         },
       });
 
@@ -683,6 +687,17 @@ Deno.serve(async (req) => {
           event_type: 'private_message_ignored',
           error_message: 'Mensagem privada ignorada: card não existe',
           latency_ms: Date.now() - startTime,
+          payload: {
+            rawInput: rawPayload,
+            decisionContext: {
+              reason: 'Mensagem privada sem card existente',
+              isPrivate: true,
+              messageType,
+              messageId,
+              labels: labels || [],
+              webhookPath
+            }
+          }
         });
         return new Response(
           JSON.stringify({ success: true, message: 'Private message ignored - no existing card', skipped: true }),
@@ -700,6 +715,17 @@ Deno.serve(async (req) => {
           event_type: 'outgoing_message_ignored',
           error_message: 'Mensagem de saída ignorada: card não existe',
           latency_ms: Date.now() - startTime,
+          payload: {
+            rawInput: rawPayload,
+            decisionContext: {
+              reason: 'Mensagem de saída sem card existente',
+              isPrivate,
+              messageType,
+              messageId,
+              labels: labels || [],
+              webhookPath
+            }
+          }
         });
         return new Response(
           JSON.stringify({ success: true, message: 'Outgoing message ignored - no existing card', skipped: true }),
@@ -776,12 +802,18 @@ Deno.serve(async (req) => {
           error_message: 'Criação negada: Sem critério de classificação (labels ou path mapeado)',
           latency_ms: Date.now() - startTime,
           payload: { 
-            labels: labels || [], 
-            webhookPath,
-            hasValidLabels,
-            hasValidWebhookPath,
-            labelFunil,
-            webhookConfigName: webhookConfig?.name
+            rawInput: rawPayload,
+            decisionContext: {
+              reason: 'Sem labels mapeadas ou webhook_path específico configurado',
+              labels: labels || [], 
+              webhookPath,
+              hasValidLabels,
+              hasValidWebhookPath,
+              labelFunil,
+              webhookConfigName: webhookConfig?.name,
+              messageType,
+              isPrivate: payload?.private || false
+            }
           }
         });
         return new Response(
@@ -826,7 +858,18 @@ Deno.serve(async (req) => {
           status: 'error',
           conversation_id: conversationId,
           error_message: healError.message,
-          latency_ms: Date.now() - startTime
+          latency_ms: Date.now() - startTime,
+          payload: {
+            rawInput: rawPayload,
+            decisionContext: {
+              reason: 'Erro ao criar card via auto-heal',
+              errorDetails: healError.message,
+              funil: final_funil_nome,
+              etapa: final_etapa_nome,
+              labels: labels || [],
+              webhookPath
+            }
+          }
         });
         return new Response(
           JSON.stringify({ error: 'Failed to auto-heal card' }),
