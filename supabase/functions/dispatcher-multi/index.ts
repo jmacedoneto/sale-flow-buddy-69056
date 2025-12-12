@@ -656,8 +656,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Handler para message_created (mensagens públicas e privadas)
-    if (eventType === 'message_created') {
+    // Handler para message_created e message_updated (mensagens públicas e privadas)
+    if (eventType === 'message_created' || eventType === 'message_updated') {
       const messageContent = payload.content || payload.message?.content || '';
       const isPrivate = payload.private === true || payload.message?.private === true;
       const messageId = payload.id || payload.message?.id;
@@ -724,20 +724,75 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Card não existe - logar e ignorar
+      // AUTO-HEAL: Card não existe - criar automaticamente
+      console.log('[AUTO-HEAL] Criando card para conversa órfã:', conversationId);
+
+      // 1. Preparar dados do card (reutilizando variáveis do escopo)
+      const cardData = {
+        chatwoot_conversa_id: conversationId,
+        funil_id: funilId,
+        etapa_id: etapaId,
+        funil_nome: final_funil_nome,
+        funil_etapa: final_etapa_nome,
+        titulo: contactName || `Conversa #${conversationId}`,
+        resumo: contactPhone ? `Tel: ${contactPhone}` : null,
+        status: 'em_andamento',
+        data_retorno: dataRetornoFinal,
+        last_chatwoot_sync_at: new Date().toISOString()
+      };
+
+      // 2. Criar card (Upsert seguro contra race condition)
+      const { data: healedCard, error: healError } = await supabase
+        .from('cards_conversas')
+        .upsert(cardData, { onConflict: 'chatwoot_conversa_id' })
+        .select('id')
+        .single();
+
+      if (healError) {
+        console.error('[AUTO-HEAL] Falha:', healError);
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          event_type: 'auto_heal_failed',
+          status: 'error',
+          conversation_id: conversationId,
+          error_message: healError.message,
+          latency_ms: Date.now() - startTime
+        });
+        return new Response(
+          JSON.stringify({ error: 'Failed to auto-heal card' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 3. Log de sucesso
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
+        event_type: 'auto_heal_card_created',
+        status: 'success',
         conversation_id: conversationId,
-        status: 'warning',
-        event_type: 'message_created_no_card',
-        error_message: 'Mensagem recebida mas card não existe para esta conversa',
+        card_id: healedCard.id,
         latency_ms: Date.now() - startTime,
-        payload: { messageId, isPrivate, contentPreview: messageContent?.substring(0, 100) }
+        payload: { trigger: eventType, funil: final_funil_nome, etapa: final_etapa_nome }
       });
 
+      console.log('[AUTO-HEAL] Card criado com sucesso:', healedCard.id);
+
+      // 4. Processar mensagem com card recém-criado
+      if (isPrivate && messageId) {
+        await supabase
+          .from('atividades_cards')
+          .insert({
+            card_id: healedCard.id,
+            tipo: 'MENSAGEM_PRIVADA',
+            descricao: messageContent || 'Mensagem privada do Chatwoot',
+            chatwoot_message_id: messageId,
+            privado: true
+          });
+      }
+
       return new Response(
-        JSON.stringify({ success: true, message: 'Message ignored - no card exists' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ success: true, message: 'Auto-healed card and processed message', card_id: healedCard.id }),
+        { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
