@@ -598,6 +598,64 @@ Deno.serve(async (req) => {
       );
     }
 
+    // HANDLER: conversation_created (CRIAR CARD NOVO)
+    if (eventType === 'conversation_created') {
+      console.log('[conversation_created] Iniciando criação de card:', { conversationId, final_funil_nome, contactName });
+
+      // 1. Preparar dados do card
+      const cardData = {
+        chatwoot_conversa_id: conversationId,
+        funil_id: funilId,
+        etapa_id: etapaId,
+        funil_nome: final_funil_nome,
+        funil_etapa: final_etapa_nome,
+        titulo: contactName || `Conversa #${conversationId}`,
+        resumo: contactPhone ? `Tel: ${contactPhone}` : null,
+        status: 'em_andamento',
+        data_retorno: dataRetornoFinal,
+        last_chatwoot_sync_at: new Date().toISOString()
+      };
+
+      // 2. Tentar inserir (Upsert seguro)
+      const { data: card, error: upsertError } = await supabase
+        .from('cards_conversas')
+        .upsert(cardData, { onConflict: 'chatwoot_conversa_id' })
+        .select('id')
+        .single();
+
+      if (upsertError) {
+        console.error('[conversation_created] Erro ao criar card:', upsertError);
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          event_type: 'conversation_created',
+          status: 'error',
+          conversation_id: conversationId,
+          error_message: upsertError.message,
+          latency_ms: Date.now() - startTime,
+          payload: { funil: final_funil_nome, contact: contactName }
+        });
+        throw upsertError;
+      }
+
+      // 3. Log de sucesso
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        event_type: 'conversation_created',
+        status: 'success',
+        conversation_id: conversationId,
+        card_id: card.id,
+        latency_ms: Date.now() - startTime,
+        payload: { funil: final_funil_nome, etapa: final_etapa_nome, contact: contactName }
+      });
+
+      console.log('[conversation_created] Card criado com sucesso:', card.id);
+
+      return new Response(
+        JSON.stringify({ success: true, message: 'Card created from conversation_created', card_id: card.id }),
+        { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Handler para message_created (mensagens públicas e privadas)
     if (eventType === 'message_created') {
       const messageContent = payload.content || payload.message?.content || '';
