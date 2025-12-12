@@ -4,17 +4,35 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Settings, CheckCircle, XCircle, Clock } from "lucide-react";
+import { Shield, Settings, CheckCircle, XCircle, Clock, Key } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GerenciarFunisUsuario } from "./GerenciarFunisUsuario";
+import { PermissionsModal } from "./PermissionsModal";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUpdateUserStatus } from "@/hooks/useUpdateUserStatus";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+
+interface PermissionValues {
+  criar_card: boolean;
+  editar_card: boolean;
+  deletar_card: boolean;
+  edit_funil: boolean;
+  edit_etapas: boolean;
+  ver_relatorios: boolean;
+  gerenciar_usuarios: boolean;
+}
 
 export const AbaUsuarios = () => {
   const [gerenciarFunisOpen, setGerenciarFunisOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<{ id: string; nome: string } | null>(null);
   const [statusTab, setStatusTab] = useState<'todos' | 'pending' | 'approved' | 'blocked'>('todos');
+  const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
+  const [userForPermissions, setUserForPermissions] = useState<{
+    id: string;
+    nome?: string;
+    email: string;
+    permissions: PermissionValues;
+  } | null>(null);
 
   const { isAdmin, loading: permissionsLoading } = usePermissions();
   const updateUserStatus = useUpdateUserStatus();
@@ -206,6 +224,30 @@ export const AbaUsuarios = () => {
                             <Settings className="h-4 w-4 mr-2" />
                             Funis
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setUserForPermissions({
+                                id: user.id,
+                                nome: user.nome || undefined,
+                                email: user.email,
+                                permissions: {
+                                  criar_card: user.criar_card ?? false,
+                                  editar_card: user.editar_card ?? false,
+                                  deletar_card: user.deletar_card ?? false,
+                                  edit_funil: user.edit_funil ?? false,
+                                  edit_etapas: user.edit_etapas ?? false,
+                                  ver_relatorios: user.ver_relatorios ?? false,
+                                  gerenciar_usuarios: user.gerenciar_usuarios ?? false,
+                                }
+                              });
+                              setPermissionsModalOpen(true);
+                            }}
+                          >
+                            <Key className="h-4 w-4 mr-2" />
+                            Permissões
+                          </Button>
                         </div>
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
@@ -226,6 +268,18 @@ export const AbaUsuarios = () => {
           onOpenChange={setGerenciarFunisOpen}
           userId={selectedUser.id}
           userName={selectedUser.nome}
+        />
+      )}
+
+      {userForPermissions && (
+        <PermissionsModal
+          isOpen={permissionsModalOpen}
+          onClose={() => {
+            setPermissionsModalOpen(false);
+            setUserForPermissions(null);
+          }}
+          user={userForPermissions}
+          initialPermissions={userForPermissions.permissions}
         />
       )}
     </div>

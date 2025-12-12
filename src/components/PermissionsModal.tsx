@@ -14,7 +14,6 @@ interface Permission {
 }
 
 interface PermissionValues {
-  ver_dashboard: boolean;
   criar_card: boolean;
   editar_card: boolean;
   deletar_card: boolean;
@@ -36,7 +35,6 @@ interface PermissionsModalProps {
 }
 
 const PERMISSIONS: Permission[] = [
-  { id: 'ver_dashboard', label: 'Visualizar Dashboard', key: 'ver_dashboard' },
   { id: 'criar_card', label: 'Criar Cards', key: 'criar_card' },
   { id: 'editar_card', label: 'Editar Cards', key: 'editar_card' },
   { id: 'deletar_card', label: 'Deletar Cards', key: 'deletar_card' },
@@ -49,7 +47,6 @@ const PERMISSIONS: Permission[] = [
 export const PermissionsModal = ({ isOpen, onClose, user, initialPermissions = {} }: PermissionsModalProps) => {
   const queryClient = useQueryClient();
   const [permissions, setPermissions] = useState<PermissionValues>({
-    ver_dashboard: initialPermissions.ver_dashboard ?? false,
     criar_card: initialPermissions.criar_card ?? false,
     editar_card: initialPermissions.editar_card ?? false,
     deletar_card: initialPermissions.deletar_card ?? false,
