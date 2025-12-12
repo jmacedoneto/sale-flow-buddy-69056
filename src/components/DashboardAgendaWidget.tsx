@@ -1,12 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Clock, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Link } from "react-router-dom";
-import { format, isToday, isTomorrow, isBefore, startOfDay } from "date-fns";
-import { ptBR } from "date-fns/locale";
+import { isToday, isBefore, startOfDay } from "date-fns";
 
 /**
  * GRUPO C.3: Widget de resumo de agenda do usuário no Dashboard
@@ -42,83 +39,53 @@ export const DashboardAgendaWidget = () => {
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Minha Agenda
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Carregando...</p>
-        </CardContent>
-      </Card>
+      <div className="flex items-center gap-4 px-4 py-2.5 bg-muted/30 border border-border/50 rounded-lg">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span className="text-sm">Carregando agenda...</span>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card className="w-full">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-6">
-          {/* Título compacto */}
-          <div className="flex items-center gap-2 shrink-0">
-            <Clock className="h-4 w-4" />
-            <span className="text-sm font-semibold">Minha Agenda</span>
-          </div>
-
-          {/* Resumo horizontal compacto */}
-          <div className="flex items-center gap-3 shrink-0">
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-destructive/10 rounded-md">
-              <span className="text-lg font-bold text-destructive">{vencidas.length}</span>
-              <span className="text-xs text-muted-foreground">Vencidas</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 rounded-md">
-              <span className="text-lg font-bold text-yellow-600 dark:text-yellow-500">{deHoje.length}</span>
-              <span className="text-xs text-muted-foreground">Hoje</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 rounded-md">
-              <span className="text-lg font-bold text-primary">{proximasDias.length}</span>
-              <span className="text-xs text-muted-foreground">Próximas</span>
-            </div>
-          </div>
-
-          {/* Próximas atividades em linha */}
-          {atividades.length > 0 ? (
-            <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-auto">
-              {atividades.slice(0, 3).map(atividade => {
-                const dataPrevista = atividade.data_prevista ? new Date(atividade.data_prevista) : null;
-                const isVencida = dataPrevista && isBefore(startOfDay(dataPrevista), hoje);
-                const isHoje = dataPrevista && isToday(dataPrevista);
-                const isAmanha = dataPrevista && isTomorrow(dataPrevista);
-
-                return (
-                  <div key={atividade.id} className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 rounded-md shrink-0">
-                    <div className="flex flex-col min-w-0">
-                      <p className="text-xs font-medium truncate max-w-[150px]">{atividade.cards_conversas?.titulo}</p>
-                    </div>
-                    <Badge 
-                      variant={isVencida ? "destructive" : isHoje ? "default" : "secondary"}
-                      className="text-xs shrink-0"
-                    >
-                      {isVencida ? "Vencida" : isHoje ? "Hoje" : isAmanha ? "Amanhã" : dataPrevista ? format(dataPrevista, "dd/MM", { locale: ptBR }) : ""}
-                    </Badge>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground flex-1">Nenhuma atividade pendente</p>
-          )}
-
-          {/* Link para ver todas */}
-          <Link to="/atividades" className="shrink-0">
-            <Button variant="ghost" size="sm" className="gap-1">
-              Ver todas
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </Link>
+    <div className="flex items-center justify-between gap-4 px-4 py-2.5 bg-muted/30 border border-border/50 rounded-lg">
+      {/* Título e resumo compacto */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Clock className="h-4 w-4" />
+          <span className="text-sm font-medium">Agenda</span>
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="flex items-center gap-2 text-xs">
+          {vencidas.length > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 bg-destructive/10 text-destructive rounded">
+              {vencidas.length} vencida{vencidas.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {deHoje.length > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-500 rounded">
+              {deHoje.length} hoje
+            </span>
+          )}
+          {proximasDias.length > 0 && (
+            <span className="flex items-center gap-1 px-2 py-0.5 bg-primary/10 text-primary rounded">
+              {proximasDias.length} próxima{proximasDias.length > 1 ? 's' : ''}
+            </span>
+          )}
+          {atividades.length === 0 && (
+            <span className="text-muted-foreground">Nenhuma pendente</span>
+          )}
+        </div>
+      </div>
+
+      {/* Link discreto */}
+      <Link to="/atividades">
+        <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground gap-1">
+          Ver todas
+          <ChevronRight className="h-3 w-3" />
+        </Button>
+      </Link>
+    </div>
   );
 };
