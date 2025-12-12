@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, TestTube2, RefreshCw, Settings } from "lucide-react";
+import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, RefreshCw, LayoutGrid, List } from "lucide-react";
 import { DashboardAgendaWidget } from "@/components/DashboardAgendaWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -31,6 +31,11 @@ import { usePipelineFilters } from "@/utils/pipelineFilters";
 import { PipelineFilters } from "@/components/PipelineFilters";
 import { DashboardResumo } from "@/components/DashboardResumo";
 import { useKanbanColors } from "@/hooks/useKanbanColors";
+import { ListaCards } from "@/components/dashboard/ListaCards";
+import { useCardSelection } from "@/hooks/useCardSelection";
+import { BulkActionsBar } from "@/components/BulkActionsBar";
+
+type ViewMode = 'kanban' | 'table';
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
@@ -46,9 +51,24 @@ const Dashboard = () => {
   const [editingFunil, setEditingFunil] = useState<Funil | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [isTestingCycle, setIsTestingCycle] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
   const pageSize = 50;
+  const [isTestingCycle, setIsTestingCycle] = useState(false);
+  
+  // MÓDULO 2: Estado de ViewMode com persistência
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem('dashboard_view_mode');
+    return (saved as ViewMode) || 'kanban';
+  });
+  
+  // MÓDULO 3: Hook de seleção em massa
+  const cardSelection = useCardSelection();
+  
+  // Persistir viewMode e limpar seleção ao trocar de view
+  useEffect(() => {
+    localStorage.setItem('dashboard_view_mode', viewMode);
+    cardSelection.clear();
+  }, [viewMode]);
   
   const { filters, setFilters, applyFilters } = usePipelineFilters();
   
@@ -595,7 +615,28 @@ const Dashboard = () => {
               <CardTitle className="flex items-center justify-between">
                 Pipeline de Conversas
                 <div className="flex items-center gap-2">
-                  {/* P1.2: Botão manual de refresh */}
+                  {/* Toggle de Visualização */}
+                  <div className="flex items-center border border-border rounded-md">
+                    <Button 
+                      variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('kanban')}
+                      className="rounded-r-none gap-1"
+                    >
+                      <LayoutGrid className="h-4 w-4" />
+                      Kanban
+                    </Button>
+                    <Button 
+                      variant={viewMode === 'table' ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setViewMode('table')}
+                      className="rounded-l-none gap-1"
+                    >
+                      <List className="h-4 w-4" />
+                      Tabela
+                    </Button>
+                  </div>
+                  
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -620,7 +661,7 @@ const Dashboard = () => {
                 </div>
               </CardTitle>
               <CardDescription className="flex items-center justify-between flex-wrap gap-2">
-                <span>Arraste e solte cards entre as etapas para atualizar o status</span>
+                <span>{viewMode === 'kanban' ? 'Arraste e solte cards entre as etapas' : 'Clique nas linhas para ver detalhes'}</span>
                 <div className="flex items-center gap-2">
                   <Select value={statusFilter} onValueChange={setStatusFilter}>
                     <SelectTrigger className="w-[180px] h-8 text-xs">
@@ -650,7 +691,17 @@ const Dashboard = () => {
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
                 </div>
+              ) : viewMode === 'table' ? (
+                /* MÓDULO 2: Visão Tabela */
+                <ListaCards
+                  cards={allCards || []}
+                  onRowClick={handleCardClick}
+                  selectedIds={cardSelection.selectedIds}
+                  onToggleSelect={cardSelection.toggle}
+                  onSelectAll={cardSelection.selectAll}
+                />
               ) : etapas && etapas.length > 0 ? (
+                /* Visão Kanban */
                 <DndContext
                   sensors={sensors}
                   onDragStart={handleDragStart}
@@ -658,7 +709,6 @@ const Dashboard = () => {
                 >
                   <div className="flex gap-4 overflow-x-auto pb-4">
                     {etapas.map((etapa, index) => {
-                      // Mapear cores do kanban para as etapas (rotaciona entre as 3 cores)
                       const colorMap: Record<number, string> = {
                         0: kanbanColors.hoje,
                         1: kanbanColors.amanha,
@@ -696,7 +746,7 @@ const Dashboard = () => {
                   </DragOverlay>
                 </DndContext>
               ) : (
-                  <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground">
                   Nenhuma etapa encontrada para este funil
                 </div>
               )}
@@ -757,6 +807,14 @@ const Dashboard = () => {
         onOpenChange={setIsEtapasModalOpen}
         funilId={selectedFunilId}
         etapas={etapas}
+      />
+
+      {/* MÓDULO 3: Barra de ações em massa */}
+      <BulkActionsBar
+        selectedCount={cardSelection.count}
+        selectedIds={cardSelection.selectedIds}
+        onClear={cardSelection.clear}
+        funilId={selectedFunilId}
       />
     </div>
   );

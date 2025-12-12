@@ -661,15 +661,51 @@ Deno.serve(async (req) => {
       const messageContent = payload.content || payload.message?.content || '';
       const isPrivate = payload.private === true || payload.message?.private === true;
       const messageId = payload.id || payload.message?.id;
+      const messageType = payload.message_type || payload.message?.message_type;
       
-      console.log(`[dispatcher-multi] message_created - private: ${isPrivate}, messageId: ${messageId}, content: ${messageContent?.substring(0, 100)}`);
+      console.log(`[dispatcher-multi] message event - private: ${isPrivate}, messageType: ${messageType}, messageId: ${messageId}, content: ${messageContent?.substring(0, 100)}`);
       
-      // Buscar card existente
+      // ====== GUARD CLAUSE 1: Bloquear mensagens privadas SEM card existente ======
+      // Buscar card existente ANTES de qualquer processamento
       const { data: cardExists } = await supabase
         .from('cards_conversas')
         .select('id')
         .eq('chatwoot_conversa_id', conversationId)
         .maybeSingle();
+
+      // GUARD: Mensagem privada sem card = IGNORAR (não criar card para isso)
+      if (isPrivate && !cardExists) {
+        console.log(`[SKIP] Mensagem privada sem card existente - ignorando. ConversationId: ${conversationId}`);
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          conversation_id: conversationId,
+          status: 'skipped',
+          event_type: 'private_message_ignored',
+          error_message: 'Mensagem privada ignorada: card não existe',
+          latency_ms: Date.now() - startTime,
+        });
+        return new Response(
+          JSON.stringify({ success: true, message: 'Private message ignored - no existing card', skipped: true }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // ====== GUARD CLAUSE 2: Bloquear mensagens de SAÍDA sem card existente ======
+      if (messageType === 'outgoing' && !cardExists) {
+        console.log(`[SKIP] Mensagem de saída sem card existente - ignorando. ConversationId: ${conversationId}`);
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          conversation_id: conversationId,
+          status: 'skipped',
+          event_type: 'outgoing_message_ignored',
+          error_message: 'Mensagem de saída ignorada: card não existe',
+          latency_ms: Date.now() - startTime,
+        });
+        return new Response(
+          JSON.stringify({ success: true, message: 'Outgoing message ignored - no existing card', skipped: true }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
 
       if (cardExists && messageId) {
         // Processar mensagem privada como atividade
@@ -724,8 +760,42 @@ Deno.serve(async (req) => {
         );
       }
 
-      // AUTO-HEAL: Card não existe - criar automaticamente
-      console.log('[AUTO-HEAL] Criando card para conversa órfã:', conversationId);
+      // ====== AUTO-HEAL COM CRITÉRIO ESTRITO ======
+      // GUARD CLAUSE 3: Só criar card se houver CRITÉRIO VÁLIDO (labels OU webhook_path mapeado)
+      const hasValidLabels = labels && labels.length > 0 && labelFunil;
+      const hasValidWebhookPath = webhookConfig?.name && final_funil_nome !== 'Comercial'; // Comercial é fallback universal
+      const hasValidCriteria = hasValidLabels || hasValidWebhookPath;
+
+      if (!hasValidCriteria) {
+        console.log(`[AUTO-HEAL NEGADO] Sem critério de classificação válido. ConversationId: ${conversationId}, Labels: ${labels?.join(',') || 'nenhuma'}, WebhookPath: ${webhookPath}`);
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          conversation_id: conversationId,
+          status: 'skipped',
+          event_type: 'auto_heal_denied',
+          error_message: 'Criação negada: Sem critério de classificação (labels ou path mapeado)',
+          latency_ms: Date.now() - startTime,
+          payload: { 
+            labels: labels || [], 
+            webhookPath,
+            hasValidLabels,
+            hasValidWebhookPath,
+            labelFunil,
+            webhookConfigName: webhookConfig?.name
+          }
+        });
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Auto-heal denied: no valid classification criteria',
+            skipped: true,
+            reason: 'Sem labels mapeadas ou webhook_path configurado'
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      console.log(`[AUTO-HEAL] Criando card com critério válido. ConversationId: ${conversationId}, Funil: ${final_funil_nome}, Critério: ${hasValidLabels ? 'label' : 'webhook_path'}`);
 
       // 1. Preparar dados do card (reutilizando variáveis do escopo)
       const cardData = {
