@@ -2,21 +2,26 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, Circle } from "lucide-react";
 import { useSystemHealth } from "@/hooks/useSystemHealth";
+import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
 
 export const Header = () => {
   const location = useLocation();
   const { data: healthStatus } = useSystemHealth();
+  const { isAdmin } = usePermissions();
 
   const chatwootHealth = healthStatus?.find(h => h.service === 'chatwoot');
   const isHealthy = chatwootHealth?.status === 'operational';
 
-  const navItems = [
-    { path: "/dashboard-comercial", label: "Comercial", icon: BarChart3 },
-    { path: "/dashboard-administrativo", label: "Administrativo", icon: Wrench },
-    { path: "/atividades", label: "Atividades", icon: FileText },
-    { path: "/configuracoes", label: "Configurações", icon: Settings },
+  const allNavItems = [
+    { path: "/dashboard-comercial", label: "Comercial", icon: BarChart3, requireAdmin: false },
+    { path: "/dashboard-administrativo", label: "Administrativo", icon: Wrench, requireAdmin: false },
+    { path: "/atividades", label: "Atividades", icon: FileText, requireAdmin: false },
+    { path: "/configuracoes", label: "Configurações", icon: Settings, requireAdmin: true },
   ];
+
+  // Filtra itens de navegação baseado em permissões
+  const navItems = allNavItems.filter(item => !item.requireAdmin || isAdmin);
 
   return (
     <header className="border-b border-border bg-card/95 backdrop-blur sticky top-0 z-50 shadow-sm">
@@ -71,11 +76,13 @@ export const Header = () => {
 
           {/* Mobile Menu */}
           <div className="flex md:hidden">
-            <Link to="/configuracoes">
-              <Button variant="ghost" size="sm">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </Link>
+            {isAdmin && (
+              <Link to="/configuracoes">
+                <Button variant="ghost" size="sm">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </div>
