@@ -12,10 +12,30 @@ serve(async (req) => {
   }
 
   try {
-    const { card_id: cardId } = await req.json();
+    const body = await req.json();
+    let cardId = body.card_id;
+    const conversationId = body.conversationId || body.conversation_id;
+    
+    // Se não recebeu card_id mas recebeu conversationId, buscar o card
+    if (!cardId && conversationId) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      
+      const { data: cardByConversation } = await supabase
+        .from('cards_conversas')
+        .select('id')
+        .eq('chatwoot_conversa_id', conversationId)
+        .maybeSingle();
+      
+      if (cardByConversation) {
+        cardId = cardByConversation.id;
+        console.log(`[ai-resumo] Resolved card_id ${cardId} from conversationId ${conversationId}`);
+      }
+    }
     
     if (!cardId) {
-      throw new Error('card_id é obrigatório');
+      throw new Error('card_id ou conversationId é obrigatório');
     }
 
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');

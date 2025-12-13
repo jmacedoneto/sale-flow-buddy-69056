@@ -31,6 +31,35 @@ interface MappingConfig {
 
 type TipoFunil = 'COMERCIAL' | 'ADMIN';
 
+/**
+ * Resolve nome do contato com múltiplos fallbacks (DRY)
+ * Verifica vários caminhos possíveis no payload do Chatwoot/N8N
+ */
+function resolveContactName(payload: any, conversationId: number): string {
+  // Ordem de prioridade para extração do nome
+  const candidates = [
+    payload?.sender?.name,
+    payload?.contact?.name,
+    payload?.meta?.sender?.name,
+    payload?.conversation?.contact?.name,
+    payload?.conversation?.meta?.sender?.name,
+    payload?.message?.sender?.name,
+    payload?.conversation?.sender?.name,
+    // Fallbacks adicionais para N8N
+    payload?.data?.sender?.name,
+    payload?.data?.contact?.name,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'string' && candidate.trim().length > 0) {
+      return candidate.trim();
+    }
+  }
+
+  // Fallback final - genérico com ID
+  return `Conversa Chatwoot #${conversationId}`;
+}
+
 // Resolve funil baseado em labels (PRIORIDADE 1 - SSOT)
 function resolveFunilByLabel(
   labels: string[],
@@ -347,13 +376,12 @@ Deno.serve(async (req) => {
 
     const conv = payload.conversation || payload;
 
-    // Extrair dados do contato
+    // Extrair dados do contato usando função robusta
     const contactId = payload.contact?.id || payload.meta?.sender?.id || null;
-    const contactName = payload.contact?.name || 
-                       payload.meta?.sender?.name || 
-                       `Conversa Chatwoot #${conversationId}`;
+    const contactName = resolveContactName(payload, conversationId);
     const contactPhone = payload.contact?.phone_number || payload.meta?.sender?.phone_number || null;
-
+    
+    console.log(`[dispatcher-multi] Contact resolved: name="${contactName}", id=${contactId}, phone=${contactPhone}`);
     const { data: mappingsData } = await supabase
       .from('mappings_config')
       .select('*')
@@ -571,6 +599,37 @@ Deno.serve(async (req) => {
           card_id: cardId,
           tipo: 'DATA_RETORNO',
           descricao: `Data de retorno definida: ${dataRetornoFinal}`,
+          privado: false,
+        });
+      }
+
+      // MÓDULO 2: Criar atividade via custom_attributes (resumo_atividade / data_followup)
+      const resumoAtividade = mergedAttrs['resumo_atividade'];
+      const dataFollowup = mergedAttrs['data_followup'];
+      
+      if (resumoAtividade || dataFollowup) {
+        console.log(`[dispatcher-multi] Criando atividade FOLLOWUP via atributos: resumo="${resumoAtividade}", data="${dataFollowup}"`);
+        
+        // Converter data_followup para formato ISO se necessário
+        let dataPrevista: string | null = null;
+        if (dataFollowup) {
+          try {
+            // Tentar parsear diferentes formatos de data
+            const parsedDate = new Date(dataFollowup);
+            if (!isNaN(parsedDate.getTime())) {
+              dataPrevista = parsedDate.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.warn(`[dispatcher-multi] Falha ao parsear data_followup: ${dataFollowup}`);
+          }
+        }
+        
+        await supabase.from('atividades_cards').insert({
+          card_id: cardId,
+          tipo: 'FOLLOWUP_CHATWOOT',
+          descricao: resumoAtividade || 'Follow-up automático via Chatwoot',
+          data_prevista: dataPrevista,
+          status: 'pendente',
           privado: false,
         });
       }
