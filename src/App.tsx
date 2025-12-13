@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
 import { useRealtimeErrorAlerts } from "@/hooks/useRealtimeErrorAlerts";
 import { AIChat } from "@/components/AIChat";
 import Index from "./pages/Index";
@@ -34,7 +35,7 @@ const AppContent = () => {
         <Route path="/dashboard-comercial" element={<ProtectedRoute><DashboardComercial /></ProtectedRoute>} />
         <Route path="/dashboard-administrativo" element={<ProtectedRoute><DashboardAdministrativo /></ProtectedRoute>} />
         <Route path="/atividades" element={<ProtectedRoute><Atividades /></ProtectedRoute>} />
-        <Route path="/configuracoes" element={<ProtectedRoute><Configuracoes /></ProtectedRoute>} />
+        <Route path="/configuracoes" element={<ProtectedRoute><AdminRoute><Configuracoes /></AdminRoute></ProtectedRoute>} />
         <Route path="/negociacoes-pausadas" element={<ProtectedRoute><NegociacoesPausadas /></ProtectedRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
