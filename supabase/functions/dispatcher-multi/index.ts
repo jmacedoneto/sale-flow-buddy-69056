@@ -243,12 +243,18 @@ Deno.serve(async (req) => {
     
     console.log(`[dispatcher-multi] Webhook encontrado: ${webhookConfig.name} (strategy: ${matchStrategy})`)
 
-    // Função para extrair conversation_id de múltiplos formatos
+    // Função para extrair conversation_id de múltiplos formatos (inclui suporte N8N)
     function resolveConversationId(payload: any): number | null {
+      // Log para debug
+      console.log('[dispatcher-multi] Resolving ID from payload keys:', Object.keys(payload || {}));
+
       return (
         payload.conversation_id ??
         payload.conversation?.id ??
+        payload.data?.conversation?.id ?? // Suporte a N8N
         payload.id ??
+        payload.data?.id ?? // Suporte a N8N genérico
+        payload.receivedPayload?.conversation?.id ??
         null
       );
     }
@@ -270,18 +276,18 @@ Deno.serve(async (req) => {
           body = JSON.parse(rawBody);
           rawPayload = body; // Guardar payload original para debug
           
-          console.log(`[DEBUG] Raw payload received:`, JSON.stringify(body).substring(0, 1000));
+          console.log(`📥 [Dispatcher] Payload Bruto recebido:`, JSON.stringify(body).substring(0, 200));
           
           // Validar payload não vazio
           if (!body || Object.keys(body).length === 0) {
             throw new Error('Payload vazio recebido do Chatwoot');
           }
           
-          // Unwrap: se vier de proxy (webhook.site), o Chatwoot original está em receivedPayload
-          payload = body.receivedPayload ?? body;
-          payloadFormat = body.receivedPayload ? 'wrapped' : 'raw';
+          // Unwrap inteligente: prioriza receivedPayload, depois tenta data (N8N), depois usa body cru
+          payload = body.receivedPayload ?? body.data ?? body;
+          payloadFormat = body.receivedPayload ? 'wrapped' : (body.data ? 'n8n_wrapped' : 'raw');
           
-          console.log(`[dispatcher-multi] Payload parseado (format: ${payloadFormat})`);
+          console.log(`[dispatcher-multi] Payload parseado (format: ${payloadFormat}, keys: ${Object.keys(payload).join(',')})`);
         } else {
           console.error(`[dispatcher-multi] Body vazio recebido`);
         }
