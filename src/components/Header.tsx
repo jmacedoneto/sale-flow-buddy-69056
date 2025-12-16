@@ -1,6 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Settings, LayoutDashboard, BarChart3, Wrench, ListTodo, Menu } from "lucide-react";
+import { Settings, LayoutDashboard, BarChart3, Wrench, ListTodo, Menu, UserCircle, Key, LogOut } from "lucide-react";
 import { useSystemHealth } from "@/hooks/useSystemHealth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,15 @@ import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { ThemeToggle } from "./ThemeToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
 const getInitials = (name: string): string => {
   if (!name) return "?";
@@ -23,6 +32,7 @@ const getInitials = (name: string): string => {
 
 export const Header = () => {
   const location = useLocation();
+  const navigate = useNavigate();
   const { data: healthStatus } = useSystemHealth();
   const { isAdmin } = usePermissions();
   const { user } = useAuth();
@@ -44,6 +54,17 @@ export const Header = () => {
 
     fetchUserData();
   }, [user?.id]);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success("Logout realizado com sucesso!");
+      navigate("/auth");
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+      toast.error("Erro ao fazer logout");
+    }
+  };
 
   const chatwootHealth = healthStatus?.find(h => h.service === 'chatwoot');
   const isHealthy = chatwootHealth?.status === 'operational';
@@ -125,25 +146,40 @@ export const Header = () => {
           <div className="flex items-center gap-2">
             <ThemeToggle />
             
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link to="/configuracoes">
-                    <Avatar className="h-8 w-8 border-2 border-primary/20 cursor-pointer hover:border-primary/50 transition-colors">
-                      {userData?.avatar_url ? (
-                        <AvatarImage src={userData.avatar_url} alt={userData.nome || 'Usuário'} />
-                      ) : null}
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                        {getInitials(userData?.nome || user?.email || '')}
-                      </AvatarFallback>
-                    </Avatar>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p className="text-xs">{userData?.nome || user?.email}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Avatar className="h-8 w-8 border-2 border-primary/20 cursor-pointer hover:border-primary/50 transition-colors">
+                  {userData?.avatar_url ? (
+                    <AvatarImage src={userData.avatar_url} alt={userData.nome || 'Usuário'} />
+                  ) : null}
+                  <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                    {getInitials(userData?.nome || user?.email || '')}
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-popover border border-border shadow-lg z-[100]">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{userData?.nome || 'Usuário'}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => navigate('/configuracoes?tab=perfil')} className="cursor-pointer">
+                  <UserCircle className="h-4 w-4 mr-2" />
+                  Meu Perfil
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => navigate('/configuracoes?tab=senha')} className="cursor-pointer">
+                  <Key className="h-4 w-4 mr-2" />
+                  Alterar Senha
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="cursor-pointer text-destructive focus:text-destructive">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Mobile Menu */}
             <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
@@ -177,6 +213,18 @@ export const Header = () => {
                       </Link>
                     );
                   })}
+                  <div className="border-t border-border my-2" />
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start gap-3 text-destructive hover:text-destructive"
+                    onClick={() => {
+                      setMobileOpen(false);
+                      handleLogout();
+                    }}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Sair
+                  </Button>
                 </nav>
               </SheetContent>
             </Sheet>

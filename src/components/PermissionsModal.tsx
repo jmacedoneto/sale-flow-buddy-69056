@@ -6,11 +6,13 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
+import { Separator } from '@/components/ui/separator';
 
 interface Permission {
   id: string;
   label: string;
   key: keyof PermissionValues;
+  description?: string;
 }
 
 interface PermissionValues {
@@ -21,6 +23,7 @@ interface PermissionValues {
   edit_etapas: boolean;
   ver_relatorios: boolean;
   gerenciar_usuarios: boolean;
+  ver_cards_outros: boolean;
 }
 
 interface PermissionsModalProps {
@@ -35,13 +38,17 @@ interface PermissionsModalProps {
 }
 
 const PERMISSIONS: Permission[] = [
-  { id: 'criar_card', label: 'Criar Cards', key: 'criar_card' },
-  { id: 'editar_card', label: 'Editar Cards', key: 'editar_card' },
-  { id: 'deletar_card', label: 'Deletar Cards', key: 'deletar_card' },
-  { id: 'edit_funil', label: 'Editar Funis', key: 'edit_funil' },
-  { id: 'edit_etapas', label: 'Editar Etapas', key: 'edit_etapas' },
-  { id: 'ver_relatorios', label: 'Ver Relatórios', key: 'ver_relatorios' },
-  { id: 'gerenciar_usuarios', label: 'Gerenciar Usuários (Admin)', key: 'gerenciar_usuarios' },
+  { id: 'criar_card', label: 'Criar Cards', key: 'criar_card', description: 'Permite criar novos cards no pipeline' },
+  { id: 'editar_card', label: 'Editar Cards', key: 'editar_card', description: 'Permite editar cards existentes' },
+  { id: 'deletar_card', label: 'Deletar Cards', key: 'deletar_card', description: 'Permite excluir cards' },
+  { id: 'edit_funil', label: 'Editar Funis', key: 'edit_funil', description: 'Permite criar e editar funis' },
+  { id: 'edit_etapas', label: 'Editar Etapas', key: 'edit_etapas', description: 'Permite criar e editar etapas dos funis' },
+  { id: 'ver_relatorios', label: 'Ver Relatórios', key: 'ver_relatorios', description: 'Acesso aos dashboards e relatórios' },
+  { id: 'gerenciar_usuarios', label: 'Gerenciar Usuários (Admin)', key: 'gerenciar_usuarios', description: 'Permite aprovar e gerenciar outros usuários' },
+];
+
+const SPECIAL_PERMISSIONS: Permission[] = [
+  { id: 'ver_cards_outros', label: 'Ver Cards de Outros Usuários', key: 'ver_cards_outros', description: 'Permite visualizar cards atribuídos a outros agentes' },
 ];
 
 export const PermissionsModal = ({ isOpen, onClose, user, initialPermissions = {} }: PermissionsModalProps) => {
@@ -54,6 +61,7 @@ export const PermissionsModal = ({ isOpen, onClose, user, initialPermissions = {
     edit_etapas: initialPermissions.edit_etapas ?? false,
     ver_relatorios: initialPermissions.ver_relatorios ?? false,
     gerenciar_usuarios: initialPermissions.gerenciar_usuarios ?? false,
+    ver_cards_outros: initialPermissions.ver_cards_outros ?? false,
   });
   const [isLoading, setIsLoading] = useState(false);
 
@@ -92,26 +100,65 @@ export const PermissionsModal = ({ isOpen, onClose, user, initialPermissions = {
         </DialogHeader>
 
         <div className="space-y-4 py-4">
-          {PERMISSIONS.map((permission) => (
-            <div key={permission.id} className="flex items-center space-x-2">
-              <Checkbox
-                id={permission.id}
-                checked={permissions[permission.key]}
-                onCheckedChange={(checked) =>
-                  setPermissions((prev) => ({
-                    ...prev,
-                    [permission.key]: checked === true,
-                  }))
-                }
-              />
-              <Label
-                htmlFor={permission.id}
-                className="text-sm font-normal cursor-pointer"
-              >
-                {permission.label}
-              </Label>
-            </div>
-          ))}
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-muted-foreground">Permissões Gerais</h4>
+            {PERMISSIONS.map((permission) => (
+              <div key={permission.id} className="flex items-start space-x-3">
+                <Checkbox
+                  id={permission.id}
+                  checked={permissions[permission.key]}
+                  onCheckedChange={(checked) =>
+                    setPermissions((prev) => ({
+                      ...prev,
+                      [permission.key]: checked === true,
+                    }))
+                  }
+                />
+                <div className="flex flex-col gap-0.5">
+                  <Label
+                    htmlFor={permission.id}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {permission.label}
+                  </Label>
+                  {permission.description && (
+                    <span className="text-xs text-muted-foreground">{permission.description}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <h4 className="text-sm font-medium text-muted-foreground">Visibilidade</h4>
+            {SPECIAL_PERMISSIONS.map((permission) => (
+              <div key={permission.id} className="flex items-start space-x-3">
+                <Checkbox
+                  id={permission.id}
+                  checked={permissions[permission.key]}
+                  onCheckedChange={(checked) =>
+                    setPermissions((prev) => ({
+                      ...prev,
+                      [permission.key]: checked === true,
+                    }))
+                  }
+                />
+                <div className="flex flex-col gap-0.5">
+                  <Label
+                    htmlFor={permission.id}
+                    className="text-sm font-normal cursor-pointer"
+                  >
+                    {permission.label}
+                  </Label>
+                  {permission.description && (
+                    <span className="text-xs text-muted-foreground">{permission.description}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         <DialogFooter>

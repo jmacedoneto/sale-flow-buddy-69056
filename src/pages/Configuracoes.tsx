@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AbaConfigChatwoot } from "@/components/AbaConfigChatwoot";
 import { AbaWebhooks } from "@/components/AbaWebhooks";
 import { AbaWebhooksExternos } from "@/components/AbaWebhooksExternos";
@@ -11,12 +12,11 @@ import { AbaMotivosPerda } from "@/components/AbaMotivosPerda";
 import { AbaKanbanColors } from "@/components/AbaKanbanColors";
 import { AbaFunis } from "@/components/AbaFunis";
 import { AbaPerfilUsuario } from "@/components/AbaPerfilUsuario";
+import { AbaAlterarSenha } from "@/components/AbaAlterarSenha";
 import { AbaApiDocs } from "@/components/AbaApiDocs";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
-  ShieldAlert, 
   MessageSquare, 
   Webhook, 
   ExternalLink, 
@@ -30,7 +30,8 @@ import {
   Palette,
   Settings,
   UserCircle,
-  Code
+  Code,
+  Key
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,13 +45,16 @@ interface MenuItem {
 interface MenuCategory {
   title: string;
   items: MenuItem[];
+  adminOnly?: boolean;
 }
 
-const menuCategories: MenuCategory[] = [
+// Menu completo para admins
+const fullMenuCategories: MenuCategory[] = [
   {
     title: "Pessoal",
     items: [
-      { id: "perfil", label: "Meu Perfil", icon: UserCircle, adminOnly: false },
+      { id: "perfil", label: "Meu Perfil", icon: UserCircle },
+      { id: "senha", label: "Alterar Senha", icon: Key },
     ]
   },
   {
@@ -60,14 +64,16 @@ const menuCategories: MenuCategory[] = [
       { id: "webhooks", label: "Webhooks Internos", icon: Webhook },
       { id: "externos", label: "Webhooks Externos", icon: ExternalLink },
       { id: "mappings", label: "Mappings", icon: GitBranch },
-    ]
+    ],
+    adminOnly: true
   },
   {
     title: "Sistema",
     items: [
       { id: "monitoramento", label: "Monitoramento", icon: Activity },
       { id: "ia", label: "Inteligência Artificial", icon: Bot },
-    ]
+    ],
+    adminOnly: true
   },
   {
     title: "Pipeline",
@@ -76,24 +82,53 @@ const menuCategories: MenuCategory[] = [
       { id: "produtos", label: "Produtos", icon: Package },
       { id: "motivos-perda", label: "Motivos de Perda", icon: XCircle },
       { id: "kanban-colors", label: "Cores Kanban", icon: Palette },
-    ]
+    ],
+    adminOnly: true
   },
   {
     title: "Administração",
     items: [
       { id: "usuarios", label: "Usuários", icon: Users },
-    ]
+    ],
+    adminOnly: true
   },
   {
     title: "Desenvolvimento",
     items: [
       { id: "api-docs", label: "API Docs", icon: Code },
+    ],
+    adminOnly: true
+  }
+];
+
+// Menu limitado para usuários comuns
+const userMenuCategories: MenuCategory[] = [
+  {
+    title: "Pessoal",
+    items: [
+      { id: "perfil", label: "Meu Perfil", icon: UserCircle },
+      { id: "senha", label: "Alterar Senha", icon: Key },
     ]
   }
 ];
+
 const Configuracoes = () => {
   const { isAdmin, loading } = usePermissions();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("perfil");
+
+  // Definir aba ativa baseado no query param
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  // Selecionar menu baseado nas permissões
+  const menuCategories = useMemo(() => {
+    return isAdmin ? fullMenuCategories : userMenuCategories;
+  }, [isAdmin]);
 
   if (loading) {
     return (
@@ -106,24 +141,15 @@ const Configuracoes = () => {
     );
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="min-h-screen bg-background p-6 flex items-center justify-center">
-        <Alert variant="destructive" className="max-w-md">
-          <ShieldAlert className="h-4 w-4" />
-          <AlertTitle>Acesso Negado</AlertTitle>
-          <AlertDescription>
-            Você não tem permissão para acessar as configurações do sistema.
-            Entre em contato com um administrador para solicitar acesso.
-          </AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
-
   const renderContent = () => {
+    // Abas disponíveis para todos
+    if (activeTab === "perfil") return <AbaPerfilUsuario />;
+    if (activeTab === "senha") return <AbaAlterarSenha />;
+    
+    // Abas apenas para admin
+    if (!isAdmin) return <AbaPerfilUsuario />;
+    
     switch (activeTab) {
-      case "perfil": return <AbaPerfilUsuario />;
       case "chatwoot": return <AbaConfigChatwoot />;
       case "webhooks": return <AbaWebhooks />;
       case "externos": return <AbaWebhooksExternos />;

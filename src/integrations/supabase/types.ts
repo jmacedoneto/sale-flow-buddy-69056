@@ -827,6 +827,7 @@ export type Database = {
           role: string | null
           status: string | null
           updated_at: string | null
+          ver_cards_outros: boolean | null
           ver_relatorios: boolean | null
         }
         Insert: {
@@ -847,6 +848,7 @@ export type Database = {
           role?: string | null
           status?: string | null
           updated_at?: string | null
+          ver_cards_outros?: boolean | null
           ver_relatorios?: boolean | null
         }
         Update: {
@@ -867,6 +869,7 @@ export type Database = {
           role?: string | null
           status?: string | null
           updated_at?: string | null
+          ver_cards_outros?: boolean | null
           ver_relatorios?: boolean | null
         }
         Relationships: []

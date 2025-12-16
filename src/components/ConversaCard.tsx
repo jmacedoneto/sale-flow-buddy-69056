@@ -265,6 +265,27 @@ export const ConversaCard = ({
             {renderAtividadeBadge()}
             {renderStatusBadge()}
           </div>
+          
+          {/* Avatar do Responsável - ao lado dos badges */}
+          {responsavel && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Avatar className="h-5 w-5 border border-border shadow-sm">
+                    {responsavel.avatar_url ? (
+                      <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
+                    ) : null}
+                    <AvatarFallback className="bg-muted text-muted-foreground text-[8px]">
+                      {getInitials(responsavel.nome || '')}
+                    </AvatarFallback>
+                  </Avatar>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  <p className="text-xs">{responsavel.nome || 'Responsável'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
 
         {/* Action Buttons - Separados do drag */}
@@ -302,29 +323,6 @@ export const ConversaCard = ({
           />
         )}
       </div>
-
-      {/* Avatar do Responsável */}
-      {responsavel && (
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="absolute bottom-3 right-3">
-                <Avatar className="h-6 w-6 border border-border shadow-sm">
-                  {responsavel.avatar_url ? (
-                    <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
-                  ) : null}
-                  <AvatarFallback className="bg-muted text-muted-foreground text-[9px]">
-                    {getInitials(responsavel.nome || '')}
-                  </AvatarFallback>
-                </Avatar>
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              <p className="text-xs">{responsavel.nome || 'Responsável'}</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      )}
     </Card>
   );
 };
