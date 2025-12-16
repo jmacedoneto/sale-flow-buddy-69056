@@ -19,6 +19,7 @@ export interface CardConversa {
   descricao_detalhada?: string | null;
   resumo_comercial?: string | null;
   etapa_id?: string;
+  etapa_origem_id?: string | null;
   status?: string;
   pausado?: boolean;
   motivo_perda_id?: string | null;

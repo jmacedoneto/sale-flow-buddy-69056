@@ -275,16 +275,30 @@ export const AbaMonitoramento = () => {
               Atualizar
             </Button>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => cleanLogs.mutate()}
-              disabled={cleanLogs.isPending}
-              className="gap-2"
-            >
-              <Trash2 className="h-4 w-4" />
-              Limpar Antigos
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={cleanLogs.isPending}
+                  className="gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Limpar Logs
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => cleanLogs.mutate(1)}>
+                  Mais de 1 dia
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => cleanLogs.mutate(7)}>
+                  Mais de 7 dias
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => cleanLogs.mutate(30)}>
+                  Mais de 30 dias
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {/* Tabela de Logs */}

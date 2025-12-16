@@ -141,16 +141,16 @@ export const getWebhookStats = async (): Promise<WebhookStats> => {
 };
 
 /**
- * Limpa logs antigos (>30 dias)
+ * Limpa logs antigos (>X dias)
  */
-export const cleanOldLogs = async (): Promise<number> => {
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+export const cleanOldLogs = async (days: number = 30): Promise<number> => {
+  const cutoffDate = new Date();
+  cutoffDate.setDate(cutoffDate.getDate() - days);
 
   const { data, error } = await supabase
     .from('webhook_sync_logs')
     .delete()
-    .lt('created_at', thirtyDaysAgo.toISOString())
+    .lt('created_at', cutoffDate.toISOString())
     .select('id');
 
   if (error) throw error;
