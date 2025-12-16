@@ -21,7 +21,7 @@ interface AtividadesAdminKanbanProps {
 
 const statusColumns = [
   { id: 'pendente', label: 'Demanda Aberta', bgColor: 'bg-destructive/5', headerBg: 'bg-destructive', borderColor: 'border-destructive/30' },
-  { id: 'em_andamento', label: 'Em Resolução', bgColor: 'bg-warning/5', headerBg: 'bg-warning', borderColor: 'border-warning/30' },
+  { id: 'postergada', label: 'Em Resolução', bgColor: 'bg-warning/5', headerBg: 'bg-warning', borderColor: 'border-warning/30' },
   { id: 'concluida', label: 'Concluído', bgColor: 'bg-success/5', headerBg: 'bg-success', borderColor: 'border-success/30' },
 ];
 
@@ -62,13 +62,13 @@ const DraggableCard = ({ atividade, onClick, onCopyPhone }: {
     <Card 
       ref={setNodeRef} 
       style={style} 
-      className="mb-3 hover:shadow-lg transition-all duration-200 bg-card/90 dark:bg-slate-700/95 backdrop-blur-sm border-border/50 rounded-xl overflow-hidden"
+      className="mb-3 hover:shadow-lg transition-all duration-200 bg-card/95 dark:bg-slate-100/95 dark:text-slate-900 backdrop-blur-sm border-border/50 rounded-xl overflow-hidden"
     >
       {/* Drag Handle */}
       <div 
         {...listeners} 
         {...attributes} 
-        className="h-5 bg-muted/50 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted border-b border-border/30"
+        className="h-5 bg-muted/50 dark:bg-slate-200 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted dark:hover:bg-slate-300 border-b border-border/30"
         style={{ touchAction: 'none' }}
       >
         <GripVertical className="h-3 w-3 text-muted-foreground/50" />

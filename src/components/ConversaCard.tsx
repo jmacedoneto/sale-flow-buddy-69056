@@ -199,7 +199,7 @@ export const ConversaCard = ({
       className="p-0
         hover:shadow-xl hover:scale-[1.02] hover:border-primary/30 
         transition-all duration-200 
-        bg-card/90 dark:bg-slate-700/95 backdrop-blur-sm border-border/50 
+        bg-card/95 dark:bg-slate-100/95 dark:text-slate-900 backdrop-blur-sm border-border/50 
         group relative rounded-xl overflow-hidden"
       onClick={handleClick}
     >
@@ -208,7 +208,7 @@ export const ConversaCard = ({
         {...listeners}
         {...attributes}
         data-drag-handle
-        className="h-6 bg-muted/50 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted border-b border-border/30"
+        className="h-6 bg-muted/50 dark:bg-slate-200 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted dark:hover:bg-slate-300 border-b border-border/30"
         style={{ touchAction: 'none' }}
       >
         <GripVertical className="h-4 w-4 text-muted-foreground/50" />

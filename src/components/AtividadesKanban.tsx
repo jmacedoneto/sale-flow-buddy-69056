@@ -73,13 +73,13 @@ const DraggableActivityCard = ({
     <Card
       ref={setNodeRef}
       style={style}
-      className={`mb-3 hover:shadow-md transition-shadow ${cor} border-l-4 bg-card/90 dark:bg-slate-700/95`}
+      className={`mb-3 hover:shadow-md transition-shadow ${cor} border-l-4 bg-card/95 dark:bg-slate-100/95 dark:text-slate-900`}
     >
       {/* Drag Handle */}
       <div 
         {...listeners}
         {...attributes}
-        className="h-6 bg-muted/50 dark:bg-slate-600/50 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted dark:hover:bg-slate-600 border-b border-border/30"
+        className="h-6 bg-muted/50 dark:bg-slate-200 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted dark:hover:bg-slate-300 border-b border-border/30"
         style={{ touchAction: 'none' }}
       >
         <GripVertical className="h-4 w-4 text-muted-foreground/50" />
