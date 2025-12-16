@@ -8,8 +8,6 @@ export const useFunis = () => {
   return useQuery<Funil[]>({
     queryKey: ["funis"],
     queryFn: async () => {
-      // RLS agora filtra automaticamente baseado em user_funil_access
-      // Admins veem todos, outros usuários veem apenas funis permitidos
       const { data, error } = await (supabase as any)
         .from("funis")
         .select("*")
@@ -18,7 +16,7 @@ export const useFunis = () => {
       if (error) throw error;
       return (data || []) as Funil[];
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos
+    staleTime: 1000 * 60 * 5,
   });
 };
 
@@ -74,9 +72,9 @@ export const useAllCardsForFunil = (
     productId?: string | null;
     openedFrom?: string | null;
     openedTo?: string | null;
-    etapaId?: string | null;       // NOVO: Filtro por etapa
-    assignedTo?: string | null;    // NOVO: Filtro por responsável
-    verMeus?: boolean;             // NOVO: Toggle "Ver Meus"
+    etapaId?: string | null;
+    assignedTo?: string | null;
+    verMeus?: boolean;
   }
 ) => {
   return useQuery<{ cards: CardWithStatus[]; totalCount: number }>({
@@ -84,7 +82,6 @@ export const useAllCardsForFunil = (
     queryFn: async () => {
       if (!funilId) return { cards: [], totalCount: 0 };
       
-      // Query com filtros e exclusão de arquivados
       let query = supabase
         .from("cards_conversas")
         .select('*', { count: 'exact' })
@@ -109,13 +106,19 @@ export const useAllCardsForFunil = (
         query = query.ilike('titulo', `%${filters.leadName}%`);
       }
       
-      // NOVO: Filtro por etapa
+      // Filtro por etapa
       if (filters?.etapaId) {
         query = query.eq('etapa_id', filters.etapaId);
       }
       
-      // NOVO: Filtro por responsável (assigned_to)
-      if (filters?.assignedTo) {
+      // RBAC: "Ver Meus" - Filtrar apenas cards do usuário logado
+      if (filters?.verMeus) {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.id) {
+          query = query.eq('assigned_to', user.id);
+        }
+      } else if (filters?.assignedTo) {
+        // Filtro específico por responsável (para admins)
         query = query.eq('assigned_to', filters.assignedTo);
       }
       
@@ -136,7 +139,6 @@ export const useAllCardsForFunil = (
       
       if (error) throw error;
       
-      // Computar status de tarefa usando o serviço
       const cardsComStatus = (data || []).map((card: any) => ({
         ...card,
         statusInfo: computarStatusTarefa(card.data_retorno)
@@ -153,6 +155,78 @@ export const useAllCardsForFunil = (
   });
 };
 
+/**
+ * Hook para disparar webhooks externos quando card muda de etapa
+ */
+async function dispatchAutomationWebhooks(
+  cardId: string,
+  oldEtapaId: string | null,
+  newEtapaId: string,
+  cardData: any
+) {
+  try {
+    // Buscar webhooks configurados para esta mudança de etapa
+    const { data: webhooks, error } = await supabase
+      .from('webhook_config')
+      .select('*')
+      .eq('ativo', true)
+      .or(`etapa_origem.eq.${oldEtapaId},etapa_destino.eq.${newEtapaId}`);
+
+    if (error || !webhooks || webhooks.length === 0) return;
+
+    for (const webhook of webhooks) {
+      // Verificar se matches os critérios
+      const matchOrigem = webhook.etapa_origem === oldEtapaId;
+      const matchDestino = webhook.etapa_destino === newEtapaId;
+      
+      // Se configurou ambos, ambos devem dar match. Se apenas um, basta aquele.
+      const shouldDispatch = 
+        (webhook.etapa_origem && webhook.etapa_destino) 
+          ? (matchOrigem && matchDestino)
+          : (matchOrigem || matchDestino);
+
+      if (!shouldDispatch || !webhook.url_externa) continue;
+
+      // Montar payload
+      const payload = {
+        event: 'card_moved',
+        card_id: cardId,
+        titulo: cardData.titulo,
+        etapa_anterior_id: oldEtapaId,
+        etapa_nova_id: newEtapaId,
+        funil_id: cardData.funil_id,
+        funil_nome: cardData.funil_nome,
+        etapa_nome: cardData.funil_etapa,
+        chatwoot_conversa_id: cardData.chatwoot_conversa_id,
+        telefone_lead: cardData.telefone_lead,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Montar headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (webhook.headers_customizados) {
+        Object.assign(headers, webhook.headers_customizados);
+      }
+
+      // Disparar webhook (fire & forget)
+      fetch(webhook.url_externa, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      }).then(res => {
+        console.log(`[Automation] Webhook ${webhook.nome} disparado: ${res.status}`);
+      }).catch(err => {
+        console.warn(`[Automation] Falha ao disparar webhook ${webhook.nome}:`, err);
+      });
+    }
+  } catch (err) {
+    console.warn('[Automation] Erro ao verificar webhooks:', err);
+  }
+}
+
 export const useMoveCard = () => {
   const queryClient = useQueryClient();
   
@@ -168,12 +242,21 @@ export const useMoveCard = () => {
       oldEtapaNome?: string;
       newEtapaNome?: string;
     }) => {
+      // Buscar etapa atual antes de atualizar
+      const { data: currentCard } = await supabase
+        .from("cards_conversas")
+        .select("etapa_id, funil_id, funil_nome, titulo, chatwoot_conversa_id, telefone_lead")
+        .eq("id", cardId)
+        .single();
+
+      const oldEtapaId = currentCard?.etapa_id || null;
+
       // Atualizar etapa do card
       const { data: card, error: updateError } = await (supabase as any)
         .from("cards_conversas")
         .update({ 
           etapa_id: newEtapaId,
-          funil_etapa: newEtapaNome // Atualizar também o nome da etapa
+          funil_etapa: newEtapaNome
         })
         .eq("id", cardId)
         .select()
@@ -208,10 +291,15 @@ export const useMoveCard = () => {
           });
           console.log(`[Sync Bidir] Chatwoot atualizado: conv ${card.chatwoot_conversa_id} → etapa "${newEtapaNome}"`);
         } catch (syncError) {
-          // Silent fail - não bloquear movimentação do card
           console.warn('[Sync Bidir] Falha ao sincronizar com Chatwoot (não crítico):', syncError);
         }
       }
+
+      // AUTOMAÇÃO: Disparar webhooks externos configurados
+      dispatchAutomationWebhooks(cardId, oldEtapaId, newEtapaId, {
+        ...card,
+        funil_etapa: newEtapaNome,
+      });
       
       return card;
     },
@@ -241,24 +329,17 @@ export const useUpdateCard = () => {
       
       if (error) throw error;
 
-      // Sync bidirecional com Chatwoot se data_retorno ou funil_etapa forem alterados
+      // Sync bidirecional com Chatwoot
       if (data.chatwoot_conversa_id && (updates.data_retorno || updates.funil_etapa)) {
         try {
           const syncPayload: any = {
             conversation_id: data.chatwoot_conversa_id,
           };
 
-          if (updates.data_retorno) {
-            syncPayload.data_retorno = updates.data_retorno;
-          }
+          if (updates.data_retorno) syncPayload.data_retorno = updates.data_retorno;
+          if (updates.funil_etapa) syncPayload.funil_etapa = updates.funil_etapa;
 
-          if (updates.funil_etapa) {
-            syncPayload.funil_etapa = updates.funil_etapa;
-          }
-
-          await supabase.functions.invoke('sync-chatwoot', {
-            body: syncPayload
-          });
+          await supabase.functions.invoke('sync-chatwoot', { body: syncPayload });
           console.log(`[Sync Bidir] Chatwoot atualizado via useUpdateCard: conv ${data.chatwoot_conversa_id}`);
         } catch (syncError) {
           console.warn('[Sync Bidir] Falha ao sincronizar com Chatwoot (não crítico):', syncError);
@@ -304,7 +385,6 @@ export const useCreateCard = () => {
       funil_etapa?: string | null;
       data_retorno?: string | null;
     }) => {
-      // Inserir novo card
       const { data: card, error: insertError } = await (supabase as any)
         .from("cards_conversas")
         .insert({
@@ -323,7 +403,6 @@ export const useCreateCard = () => {
       
       if (insertError) throw insertError;
 
-      // Criar registro de atividade de criação
       const { error: atividadeError } = await (supabase as any)
         .from("atividades_cards")
         .insert({
@@ -410,7 +489,6 @@ export const useDeleteFunil = () => {
   
   return useMutation({
     mutationFn: async (funilId: string) => {
-      // Primeiro, verificar se há cards associados
       const { data: cards, error: cardsError } = await (supabase as any)
         .from("cards_conversas")
         .select("id, etapas!inner(funil_id)")
@@ -422,7 +500,6 @@ export const useDeleteFunil = () => {
         throw new Error("Não é possível deletar um funil com cards associados");
       }
 
-      // Deletar etapas primeiro (cascade)
       const { error: etapasError } = await (supabase as any)
         .from("etapas")
         .delete()
@@ -430,7 +507,6 @@ export const useDeleteFunil = () => {
       
       if (etapasError) throw etapasError;
 
-      // Deletar funil
       const { error: funilError } = await (supabase as any)
         .from("funis")
         .delete()
@@ -514,7 +590,6 @@ export const useDeleteEtapa = () => {
   
   return useMutation({
     mutationFn: async (etapaId: string) => {
-      // Verificar se há cards associados
       const { data: cards, error: cardsError } = await (supabase as any)
         .from("cards_conversas")
         .select("id")
@@ -526,7 +601,6 @@ export const useDeleteEtapa = () => {
         throw new Error("Não é possível deletar uma etapa com cards associados");
       }
 
-      // Deletar etapa
       const { error } = await (supabase as any)
         .from("etapas")
         .delete()
@@ -553,24 +627,15 @@ export const useReorderEtapas = () => {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: async ({ updates }: { updates: { id: string; ordem: number }[] }) => {
-      // Atualizar ordem de cada etapa
-      const promises = updates.map(({ id, ordem }) => 
+    mutationFn: async (etapas: { id: string; ordem: number }[]) => {
+      const updates = etapas.map(({ id, ordem }) =>
         (supabase as any)
           .from("etapas")
           .update({ ordem })
           .eq("id", id)
       );
       
-      const results = await Promise.all(promises);
-      
-      // Verificar se houve algum erro
-      const errors = results.filter(r => r.error);
-      if (errors.length > 0) {
-        throw errors[0].error;
-      }
-      
-      return results;
+      await Promise.all(updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["etapas"] });

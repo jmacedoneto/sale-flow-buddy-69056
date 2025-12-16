@@ -155,7 +155,7 @@ const Dashboard = () => {
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8,
+        distance: 10, // Aumentado para evitar conflitos com cliques
       },
     })
   );
