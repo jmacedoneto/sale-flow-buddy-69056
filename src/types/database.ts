@@ -25,6 +25,8 @@ export interface CardConversa {
   valor_total?: number;
   telefone_lead?: string | null;
   assigned_to?: string | null;
+  avatar_lead_url?: string | null;
+  avatar_agente_url?: string | null;
 }
 
 export interface Funil {

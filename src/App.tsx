@@ -3,7 +3,9 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { ThemeProvider } from "next-themes";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { AdminRoute } from "@/components/AdminRoute";
 import { useRealtimeErrorAlerts } from "@/hooks/useRealtimeErrorAlerts";
 import { AIChat } from "@/components/AIChat";
 import { AppLayout } from "@/components/AppLayout";
@@ -15,6 +17,7 @@ import DashboardComercial from "./pages/DashboardComercial";
 import DashboardAdministrativo from "./pages/DashboardAdministrativo";
 import Atividades from "./pages/Atividades";
 import Configuracoes from "./pages/Configuracoes";
+import ApiDocs from "./pages/ApiDocs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +38,7 @@ const AppContent = () => {
         <Route path="/dashboard-administrativo" element={<ProtectedRoute><AppLayout><DashboardAdministrativo /></AppLayout></ProtectedRoute>} />
         <Route path="/atividades" element={<ProtectedRoute><AppLayout><Atividades /></AppLayout></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
+        <Route path="/api-docs" element={<AdminRoute><AppLayout><ApiDocs /></AppLayout></AdminRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
@@ -42,13 +46,15 @@ const AppContent = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AppContent />
-    </TooltipProvider>
-  </QueryClientProvider>
+  <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AppContent />
+      </TooltipProvider>
+    </QueryClientProvider>
+  </ThemeProvider>
 );
 
 export default App;
