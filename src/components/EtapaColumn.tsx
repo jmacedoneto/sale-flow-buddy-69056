@@ -9,11 +9,11 @@ interface EtapaColumnProps {
   nome: string;
   cards: CardWithStatus[];
   totalCards?: number;
-  totalValor?: number; // Soma dos valores dos cards nesta etapa
+  totalValor?: number;
   onCardClick?: (card: CardWithStatus) => void;
   onAgendarClick?: (card: CardWithStatus) => void;
-  stageColor?: string; // Cor da etapa para visual moderno
-  stageIndex?: number; // Índice para gradiente de cores
+  stageColor?: string;
+  stageIndex?: number;
 }
 
 export const EtapaColumn = ({ 
@@ -33,7 +33,7 @@ export const EtapaColumn = ({
 
   const cardIds = cards.map((card) => card.id);
   
-  // Cores modernas por etapa (do azul ao verde)
+  // Cores modernas por etapa
   const defaultColors = [
     'hsl(var(--primary))',
     'hsl(217, 91%, 60%)',
@@ -47,36 +47,45 @@ export const EtapaColumn = ({
   return (
     <div
       ref={setNodeRef}
-      className={`flex-shrink-0 w-80 bg-muted/30 rounded-lg p-4 space-y-3 transition-all border-t-4 ${
-        isOver ? "ring-2 ring-primary bg-muted/50 shadow-lg scale-[1.02]" : "shadow-sm hover:shadow-md"
-      }`}
+      className={`flex-shrink-0 w-80 rounded-2xl p-4 space-y-3 transition-all duration-300 
+        bg-card/40 backdrop-blur-sm border border-border/50
+        ${isOver 
+          ? "ring-2 ring-primary/50 bg-primary/5 shadow-xl scale-[1.02]" 
+          : "shadow-sm hover:shadow-lg hover:bg-card/60"
+        }`}
       style={{
+        borderTopWidth: '3px',
         borderTopColor: borderColor,
       }}
     >
-      <div className="flex flex-col gap-2 sticky top-0 bg-muted/30 pb-2 border-b border-border/30">
+      {/* Header */}
+      <div className="flex flex-col gap-2 sticky top-0 pb-3 border-b border-border/30">
         <div className="flex items-center justify-between">
           <h3 className="font-semibold text-foreground flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: borderColor }}></span>
+            <span 
+              className="w-2.5 h-2.5 rounded-full shadow-sm" 
+              style={{ backgroundColor: borderColor }}
+            />
             {nome}
           </h3>
           <Badge 
             variant="secondary" 
-            className="text-xs font-semibold"
+            className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
             style={{ 
-              backgroundColor: `${borderColor}20`,
+              backgroundColor: `${borderColor}15`,
               color: borderColor,
-              borderColor: borderColor
+              borderColor: `${borderColor}30`,
+              borderWidth: '1px'
             }}
           >
             {cards.length}
             {totalCards && totalCards > cards.length && (
-              <span className="ml-1 opacity-70">/ {totalCards}</span>
+              <span className="ml-1 opacity-60">/ {totalCards}</span>
             )}
           </Badge>
         </div>
         {totalValor > 0 && (
-          <div className="text-sm font-medium text-foreground">
+          <div className="text-sm font-medium text-foreground/80">
             {new Intl.NumberFormat('pt-BR', {
               style: 'currency',
               currency: 'BRL'
@@ -85,10 +94,11 @@ export const EtapaColumn = ({
         )}
       </div>
       
+      {/* Cards List */}
       <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-        <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto pr-2 scrollbar-thin">
+        <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
           {cards.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground text-sm">
+            <div className="text-center py-10 text-muted-foreground text-sm rounded-xl border border-dashed border-border/50 bg-muted/20">
               Nenhum card nesta etapa
             </div>
           ) : (

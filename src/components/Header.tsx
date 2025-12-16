@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, Circle, User } from "lucide-react";
+import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, ListTodo, Menu } from "lucide-react";
 import { useSystemHealth } from "@/hooks/useSystemHealth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const getInitials = (name: string): string => {
   if (!name) return "?";
@@ -25,6 +26,7 @@ export const Header = () => {
   const { isAdmin } = usePermissions();
   const { user } = useAuth();
   const [userData, setUserData] = useState<{ nome: string | null; avatar_url: string | null } | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -46,27 +48,32 @@ export const Header = () => {
   const isHealthy = chatwootHealth?.status === 'operational';
 
   const allNavItems = [
-    { path: "/dashboard-comercial", label: "Comercial", icon: BarChart3, requireAdmin: false },
-    { path: "/dashboard-administrativo", label: "Administrativo", icon: Wrench, requireAdmin: false },
-    { path: "/atividades", label: "Atividades", icon: FileText, requireAdmin: false },
+    { path: "/dashboard", label: "Pipeline", icon: LayoutDashboard },
+    { path: "/atividades", label: "Atividades", icon: ListTodo },
+    { path: "/dashboard-comercial", label: "Comercial", icon: BarChart3 },
+    { path: "/dashboard-administrativo", label: "Administrativo", icon: Wrench },
     { path: "/configuracoes", label: "Configurações", icon: Settings, requireAdmin: true },
   ];
 
   const navItems = allNavItems.filter(item => !item.requireAdmin || isAdmin);
 
+  const isActive = (path: string) => location.pathname === path;
+
   return (
-    <header className="border-b border-border/50 bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-card">
-      <div className="container mx-auto px-4 md:px-6 py-3">
+    <header className="border-b border-border/50 bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-sm">
+      <div className="px-4 md:px-6 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Logo e Status */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-90 transition-opacity group">
-              <div className="h-9 w-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-elegant group-hover:shadow-glow transition-shadow">
-                <LayoutDashboard className="h-5 w-5 text-white" />
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg group-hover:shadow-primary/25 transition-shadow">
+                <LayoutDashboard className="h-5 w-5 text-primary-foreground" />
               </div>
-              <div>
-                <h1 className="text-lg md:text-xl font-bold text-gradient">Gestão APVS</h1>
-                <p className="text-xs text-muted-foreground hidden md:block font-medium">
+              <div className="hidden sm:block">
+                <h1 className="text-lg font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                  Gestão APVS
+                </h1>
+                <p className="text-[10px] text-muted-foreground font-medium -mt-0.5">
                   IGUATEMI
                 </p>
               </div>
@@ -74,7 +81,7 @@ export const Header = () => {
             
             {/* Status Chatwoot */}
             <div className={cn(
-              "hidden md:flex items-center gap-2 ml-4 px-3 py-1.5 rounded-full border transition-colors",
+              "hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full border transition-colors",
               isHealthy 
                 ? "bg-success/10 border-success/30 text-success" 
                 : "bg-destructive/10 border-destructive/30 text-destructive"
@@ -84,23 +91,26 @@ export const Header = () => {
                 isHealthy ? "bg-success" : "bg-destructive"
               )} />
               <span className="text-xs font-medium">
-                {isHealthy ? "Sistema Online" : "Offline"}
+                {isHealthy ? "Online" : "Offline"}
               </span>
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-2">
+          {/* Desktop Navigation */}
+          <nav className="hidden md:flex items-center gap-1">
             {navItems.map((item) => {
               const Icon = item.icon;
-              const isActive = location.pathname === item.path;
+              const active = isActive(item.path);
               
               return (
                 <Link key={item.path} to={item.path}>
                   <Button
-                    variant={isActive ? "default" : "ghost"}
+                    variant="ghost"
                     size="sm"
-                    className="gap-2"
+                    className={cn(
+                      "gap-2 rounded-lg transition-all",
+                      active && "bg-primary/10 text-primary hover:bg-primary/15"
+                    )}
                   >
                     <Icon className="h-4 w-4" />
                     <span className="hidden lg:inline">{item.label}</span>
@@ -110,9 +120,8 @@ export const Header = () => {
             })}
           </nav>
 
-          {/* User Avatar e Mobile Menu */}
+          {/* User Avatar */}
           <div className="flex items-center gap-3">
-            {/* Avatar do usuário logado */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -134,15 +143,40 @@ export const Header = () => {
             </TooltipProvider>
 
             {/* Mobile Menu */}
-            <div className="flex md:hidden">
-              {isAdmin && (
-                <Link to="/configuracoes">
-                  <Button variant="ghost" size="sm">
-                    <Settings className="h-4 w-4" />
-                  </Button>
-                </Link>
-              )}
-            </div>
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="md:hidden">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-64">
+                <nav className="flex flex-col gap-2 mt-6">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = isActive(item.path);
+                    
+                    return (
+                      <Link 
+                        key={item.path} 
+                        to={item.path}
+                        onClick={() => setMobileOpen(false)}
+                      >
+                        <Button
+                          variant="ghost"
+                          className={cn(
+                            "w-full justify-start gap-3",
+                            active && "bg-primary/10 text-primary"
+                          )}
+                        >
+                          <Icon className="h-4 w-4" />
+                          {item.label}
+                        </Button>
+                      </Link>
+                    );
+                  })}
+                </nav>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </div>
