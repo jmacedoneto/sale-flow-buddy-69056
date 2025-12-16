@@ -23,6 +23,8 @@ export interface CardConversa {
   pausado?: boolean;
   motivo_perda_id?: string | null;
   valor_total?: number;
+  telefone_lead?: string | null;
+  assigned_to?: string | null;
 }
 
 export interface Funil {

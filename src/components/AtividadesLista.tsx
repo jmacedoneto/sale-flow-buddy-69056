@@ -2,12 +2,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { ExternalLink, CheckCircle2, Clock } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
+import { ExternalLink, CheckCircle2, Clock, Phone, Copy } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useState } from 'react';
 import { AtividadeDetailsModal } from './AtividadeDetailsModal';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
 
 interface AtividadesListaProps {
   filters: {
@@ -22,6 +24,7 @@ interface AtividadesListaProps {
 export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: AtividadesListaProps) => {
   const [selectedAtividade, setSelectedAtividade] = useState<any | null>(null);
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   
   const { data: atividades = [], isLoading, refetch } = useQuery({
     queryKey: ['atividades-lista', filters, mostrarConcluidas, searchTerm],
@@ -34,6 +37,7 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
             id,
             titulo,
             funil_id,
+            telefone_lead,
             chatwoot_conversa_id,
             funis(nome)
           )
@@ -89,17 +93,27 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
     }
   };
 
+  const handleCopyPhone = (phone: string) => {
+    navigator.clipboard.writeText(phone);
+    toast.success("Telefone copiado!");
+  };
+
+  const handleOpenCard = (cardId: string) => {
+    navigate(`/dashboard?cardId=${cardId}`);
+  };
+
   if (isLoading) {
     return <div className="p-4">Carregando atividades...</div>;
   }
 
   return (
-    <>
+    <TooltipProvider>
       <div className="border rounded-lg">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Lead/Card</TableHead>
+              <TableHead>Telefone</TableHead>
               <TableHead>Tipo</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead>Data Retorno</TableHead>
@@ -111,7 +125,7 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
           <TableBody>
             {atividades.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                   Nenhuma atividade encontrada
                 </TableCell>
               </TableRow>
@@ -120,6 +134,29 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
                 <TableRow key={atividade.id} className="cursor-pointer hover:bg-muted/50">
                   <TableCell className="font-medium">
                     {atividade.cards_conversas?.titulo || 'Sem título'}
+                  </TableCell>
+                  <TableCell>
+                    {atividade.cards_conversas?.telefone_lead ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-auto p-1 font-mono text-xs"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleCopyPhone(atividade.cards_conversas.telefone_lead);
+                            }}
+                          >
+                            <Copy className="h-3 w-3 mr-1" />
+                            {atividade.cards_conversas.telefone_lead}
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Clique para copiar</TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <span className="text-xs bg-secondary px-2 py-1 rounded">
@@ -151,6 +188,18 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => handleOpenCard(atividade.card_id)}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Abrir Card</TooltipContent>
+                      </Tooltip>
                       <Button
                         size="sm"
                         variant="ghost"
@@ -159,28 +208,21 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
                         Ver Detalhes
                       </Button>
                       {atividade.status !== 'concluida' && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleMarcarConcluida(atividade.id);
-                          }}
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {atividade.cards_conversas?.chatwoot_conversa_id && (
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(`https://app.chatwoot.com/app/accounts/1/conversations/${atividade.cards_conversas.chatwoot_conversa_id}`, '_blank');
-                          }}
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </Button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleMarcarConcluida(atividade.id);
+                              }}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Marcar como concluída</TooltipContent>
+                        </Tooltip>
                       )}
                     </div>
                   </TableCell>
@@ -202,6 +244,6 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
           }}
         />
       )}
-    </>
+    </TooltipProvider>
   );
 };
