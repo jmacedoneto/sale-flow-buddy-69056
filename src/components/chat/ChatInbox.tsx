@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useChatwootMessages } from "@/hooks/useChatwootMessages";
 import { sendChatwootMessage } from "@/services/chatwootMessagingService";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -16,12 +17,14 @@ interface ChatInboxProps {
   conversationId: number;
   cardId: string;
   funilId: string | null;
+  avatarLeadUrl?: string | null;
+  avatarAgenteUrl?: string | null;
 }
 
-export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) => {
+export const ChatInbox = ({ conversationId, cardId, funilId, avatarLeadUrl, avatarAgenteUrl }: ChatInboxProps) => {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const [pollingInterval, setPollingInterval] = useState(10000); // P7: Intervalo dinâmico
+  const [pollingInterval, setPollingInterval] = useState(10000);
   const scrollRef = useRef<HTMLDivElement>(null);
   
   const { canEditFunil } = usePermissions();
@@ -145,7 +148,12 @@ export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) =
         ) : (
           <div className="space-y-4">
             {sortedMessages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble 
+                key={msg.id} 
+                message={msg} 
+                avatarLeadUrl={avatarLeadUrl}
+                avatarAgenteUrl={avatarAgenteUrl}
+              />
             ))}
           </div>
         )}
@@ -189,23 +197,38 @@ export const ChatInbox = ({ conversationId, cardId, funilId }: ChatInboxProps) =
 };
 
 // Componente de bubble de mensagem
-const MessageBubble = ({ message }: { message: ChatwootMessage }) => {
+const MessageBubble = ({ 
+  message, 
+  avatarLeadUrl, 
+  avatarAgenteUrl 
+}: { 
+  message: ChatwootMessage;
+  avatarLeadUrl?: string | null;
+  avatarAgenteUrl?: string | null;
+}) => {
   const isAgent = message.message_type === 1; // 1 = outgoing (agent)
   const timestamp = new Date(message.created_at * 1000);
   const senderName = message.sender?.name || (isAgent ? "Agente" : "Cliente");
+  const avatarUrl = isAgent ? avatarAgenteUrl : avatarLeadUrl;
+  const initials = senderName.substring(0, 2).toUpperCase();
 
   return (
     <div className={`flex gap-3 ${isAgent ? "flex-row-reverse" : "flex-row"} animate-fade-in`}>
       {/* Avatar */}
-      <div
-        className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${
+      <Avatar className={`flex-shrink-0 w-10 h-10 shadow-sm ${
+        isAgent ? "ring-2 ring-primary/20" : "ring-2 ring-muted/50"
+      }`}>
+        {avatarUrl ? (
+          <AvatarImage src={avatarUrl} alt={senderName} />
+        ) : null}
+        <AvatarFallback className={`${
           isAgent
             ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
             : "bg-gradient-to-br from-muted to-muted/80 text-foreground"
-        }`}
-      >
-        <User className="h-5 w-5" />
-      </div>
+        }`}>
+          {initials}
+        </AvatarFallback>
+      </Avatar>
 
       {/* Conteúdo */}
       <div className={`flex-1 max-w-[75%] ${isAgent ? "text-right" : "text-left"}`}>

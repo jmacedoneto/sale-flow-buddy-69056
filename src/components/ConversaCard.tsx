@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Clock, GripVertical } from "lucide-react";
+import { MessageSquare, Clock } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useDraggable } from "@dnd-kit/core";
@@ -196,23 +196,19 @@ export const ConversaCard = ({
     <Card
       ref={setNodeRef}
       style={style}
+      {...listeners}
+      {...attributes}
       className="p-0
         hover:shadow-xl hover:scale-[1.02] hover:border-primary/30 
         transition-all duration-200 
         bg-card/95 dark:bg-slate-100/95 dark:text-slate-900 backdrop-blur-sm border-border/50 
-        group relative rounded-xl overflow-hidden"
+        group relative rounded-xl overflow-hidden cursor-grab active:cursor-grabbing"
       onClick={handleClick}
     >
-      {/* Drag Handle - Área separada para arrastar */}
+      {/* Indicador visual de drag no topo */}
       <div 
-        {...listeners}
-        {...attributes}
-        data-drag-handle
-        className="h-6 bg-muted/50 dark:bg-slate-200 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted dark:hover:bg-slate-300 border-b border-border/30"
-        style={{ touchAction: 'none' }}
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-      </div>
+        className="h-2 bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity"
+      />
 
       <div className="p-4 space-y-3">
         {/* Header com Avatar do Lead */}

@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent } from '@/components/ui/card';
 import { AtividadeCard } from '@/types/database';
-import { Clock, User, Phone, Mail, GripVertical } from 'lucide-react';
+import { Clock, Phone, Mail } from 'lucide-react';
 import { format, addDays, isToday, isTomorrow, isBefore, isAfter, differenceInDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useKanbanColors } from '@/hooks/useKanbanColors';
@@ -10,6 +10,8 @@ import { useState } from 'react';
 import { AtividadeDetailsModal } from './AtividadeDetailsModal';
 import { toast } from 'sonner';
 import { DndContext, DragEndEvent, closestCenter, useDraggable, useDroppable, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
+import { Badge } from './ui/badge';
 
 interface AtividadesKanbanProps {
   filters: {
@@ -68,40 +70,54 @@ const DraggableActivityCard = ({
   const diasDiferenca = dataPrevista ? differenceInDays(dataPrevista, hoje) : 0;
   const isVencida = diasDiferenca < 0;
   const cor = isVencida ? "border-red-500" : diasDiferenca === 0 ? "border-yellow-500" : "border-green-500";
+  
+  const avatarUrl = atividade.cards_conversas?.avatar_lead_url;
+  const leadInitials = atividade.cards_conversas?.titulo 
+    ? atividade.cards_conversas.titulo.substring(0, 2).toUpperCase() 
+    : "??";
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      className={`mb-3 hover:shadow-md transition-shadow ${cor} border-l-4 bg-card/95 dark:bg-slate-100/95 dark:text-slate-900`}
+      {...listeners}
+      {...attributes}
+      className={`mb-3 hover:shadow-md transition-shadow ${cor} border-l-4 bg-card/95 dark:bg-slate-100/95 dark:text-slate-900 cursor-grab active:cursor-grabbing group rounded-xl overflow-hidden`}
     >
-      {/* Drag Handle */}
-      <div 
-        {...listeners}
-        {...attributes}
-        className="h-6 bg-muted/50 dark:bg-slate-200 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted dark:hover:bg-slate-300 border-b border-border/30"
-        style={{ touchAction: 'none' }}
-      >
-        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
-      </div>
+      {/* Indicador visual de drag */}
+      <div className="h-1.5 bg-gradient-to-r from-primary/20 via-primary/40 to-primary/20 opacity-0 group-hover:opacity-100 transition-opacity" />
       
       <CardContent className="p-4 cursor-pointer" onClick={onClick}>
-        <div className="flex items-start gap-2">
-          <div className="mt-1">{getActivityIcon(atividade.tipo)}</div>
-          <div className="flex-1">
-            <p className="font-medium text-sm">{atividade.cards_conversas?.titulo || 'Sem título'}</p>
+        <div className="flex items-start gap-3">
+          <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
+            {avatarUrl ? (
+              <AvatarImage src={avatarUrl} alt={atividade.cards_conversas?.titulo} />
+            ) : null}
+            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
+              {leadInitials}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-sm line-clamp-1 hover:text-primary transition-colors">
+              {atividade.cards_conversas?.titulo || 'Sem título'}
+            </p>
             <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{atividade.descricao}</p>
+            
+            {/* Badges */}
             <div className="flex items-center gap-2 mt-2 flex-wrap">
-              <span className="text-xs bg-secondary px-2 py-1 rounded">{atividade.tipo}</span>
+              <Badge variant="secondary" className="text-[10px]">
+                {atividade.tipo}
+              </Badge>
               {atividade.data_prevista && (
-                <span className="text-xs text-muted-foreground">
+                <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
                   {format(new Date(atividade.data_prevista), "dd/MM 'às' HH:mm", { locale: ptBR })}
                 </span>
               )}
               {isVencida && (
-                <span className="text-xs text-red-600 font-medium">
-                  Vencida há {Math.abs(diasDiferenca)} dia(s)
-                </span>
+                <Badge variant="destructive" className="text-[10px]">
+                  Vencida há {Math.abs(diasDiferenca)}d
+                </Badge>
               )}
             </div>
           </div>
@@ -139,6 +155,7 @@ export const AtividadesKanban = ({ filters, searchTerm, prioridade, periodo }: A
             funil_id,
             chatwoot_conversa_id,
             prioridade,
+            avatar_lead_url,
             funis(nome)
           )
         `)
