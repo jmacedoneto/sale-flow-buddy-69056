@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, RefreshCw, LayoutGrid, List } from "lucide-react";
+import { Plus, TrendingUp, Users, MessageSquare, Percent, Loader2, Calendar, AlertCircle, ArrowUpDown, RefreshCw, LayoutGrid, List, LayoutDashboard } from "lucide-react";
 import { DashboardAgendaWidget } from "@/components/DashboardAgendaWidget";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -34,8 +34,9 @@ import { useKanbanColors } from "@/hooks/useKanbanColors";
 import { ListaCards } from "@/components/dashboard/ListaCards";
 import { useCardSelection } from "@/hooks/useCardSelection";
 import { BulkActionsBar } from "@/components/BulkActionsBar";
+import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
 
-type ViewMode = 'kanban' | 'table';
+type ViewMode = 'workspace' | 'kanban' | 'table';
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
@@ -58,7 +59,7 @@ const Dashboard = () => {
   // MÓDULO 2: Estado de ViewMode com persistência
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem('dashboard_view_mode');
-    return (saved as ViewMode) || 'kanban';
+    return (saved as ViewMode) || 'workspace';
   });
   
   // MÓDULO 3: Hook de seleção em massa
@@ -424,34 +425,73 @@ const Dashboard = () => {
     if (!allCards) return 0;
     return allCards.length;
   };
+  // Stats para WorkspaceLayout
+  const workspaceStats = {
+    totalDeals: statsData.totalConversas,
+    won: statsData.vendasFechadas,
+    lost: allCards?.filter(c => c.status === 'perdido').length || 0,
+  };
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card sticky top-0 z-10">
+      {/* Header Moderno */}
+      <header className="border-b border-border/50 bg-card/80 backdrop-blur-xl sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Dashboard CRM</h1>
-              <p className="text-sm text-muted-foreground mt-1">
-                Visualização Kanban dos Funis
-              </p>
-            {/* GRUPO C.3: Widget de Agenda */}
-            <div className="col-span-full lg:col-span-1">
-              <DashboardAgendaWidget />
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-gradient-primary flex items-center justify-center shadow-elegant">
+                  <LayoutDashboard className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gradient">Gestão APVS</h1>
+                  <p className="text-xs text-muted-foreground font-medium">IGUATEMI</p>
+                </div>
+              </div>
+              
+              {/* View Mode Toggle */}
+              <div className="flex items-center border border-border/50 rounded-xl bg-muted/30 p-1">
+                <Button 
+                  variant={viewMode === 'workspace' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('workspace')}
+                  className="rounded-lg gap-1"
+                >
+                  <LayoutDashboard className="h-4 w-4" />
+                  Workspace
+                </Button>
+                <Button 
+                  variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('kanban')}
+                  className="rounded-lg gap-1"
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                  Kanban
+                </Button>
+                <Button 
+                  variant={viewMode === 'table' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setViewMode('table')}
+                  className="rounded-lg gap-1"
+                >
+                  <List className="h-4 w-4" />
+                  Tabela
+                </Button>
+              </div>
             </div>
-          </div>
+            
             <div className="flex items-center gap-3">
               <Link to="/dashboard-comercial">
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2 rounded-xl">
                   <TrendingUp className="h-4 w-4" />
-                  Ver Métricas Comercial
+                  <span className="hidden lg:inline">Comercial</span>
                 </Button>
               </Link>
               <Link to="/dashboard-administrativo">
-                <Button variant="outline" size="sm" className="gap-2">
+                <Button variant="outline" size="sm" className="gap-2 rounded-xl">
                   <Users className="h-4 w-4" />
-                  Ver Métricas Administrativo
+                  <span className="hidden lg:inline">Administrativo</span>
                 </Button>
               </Link>
             </div>
@@ -460,28 +500,39 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        {/* Stats Grid */}
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          {stats.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.title} className="shadow-card transition-shadow hover:shadow-elegant">
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
-                    {stat.title}
-                  </CardTitle>
-                  <Icon className={`h-4 w-4 ${stat.color}`} />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-foreground">{stat.value}</div>
-                  <p className={`text-xs mt-1 ${stat.trend === 'up' ? 'text-success' : 'text-destructive'}`}>
-                    {stat.change} comparado ao mês anterior
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        {/* Workspace View */}
+        {viewMode === 'workspace' ? (
+          <WorkspaceLayout
+            cards={allCards || []}
+            onCardClick={handleCardClick}
+            onNewCard={() => setIsCreateModalOpen(true)}
+            stats={workspaceStats}
+            isLoading={isLoadingCards}
+          />
+        ) : (
+          <>
+            {/* Stats Grid */}
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+              {stats.map((stat) => {
+                const Icon = stat.icon;
+                return (
+                  <Card key={stat.title} className="shadow-card transition-shadow hover:shadow-elegant">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        {stat.title}
+                      </CardTitle>
+                      <Icon className={`h-4 w-4 ${stat.color}`} />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+                      <p className={`text-xs mt-1 ${stat.trend === 'up' ? 'text-success' : 'text-destructive'}`}>
+                        {stat.change} comparado ao mês anterior
+                      </p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
 
         {/* Alerta de cards sem tarefa */}
         {semTarefasCount !== undefined && semTarefasCount > 0 && (
@@ -789,6 +840,8 @@ const Dashboard = () => {
               </div>
             )}
           </Card>
+        )}
+          </>
         )}
       </main>
 
