@@ -629,6 +629,7 @@ Deno.serve(async (req) => {
           event_type: eventType,
           error_message: `Upsert error: ${upsertError.message}`,
           latency_ms: Date.now() - startTime,
+          payload: rawPayload,
         });
         throw upsertError;
       }
@@ -724,6 +725,7 @@ Deno.serve(async (req) => {
           conversation_id: conversationId,
           error_message: upsertError.message,
           latency_ms: Date.now() - startTime,
+          payload: rawPayload,
         });
         throw upsertError;
       }
@@ -809,6 +811,7 @@ Deno.serve(async (req) => {
           event_type: isPrivate ? 'private_message_ignored' : 'outgoing_message_ignored',
           error_message: 'Mensagem ignorada: sem card e sem critério válido',
           latency_ms: Date.now() - startTime,
+          payload: rawPayload,
         });
         
         return new Response(
@@ -835,6 +838,7 @@ Deno.serve(async (req) => {
             status: 'success',
             event_type: 'message_created_private',
             latency_ms: Date.now() - startTime,
+            payload: rawPayload,
           });
 
           return new Response(
@@ -861,6 +865,7 @@ Deno.serve(async (req) => {
           status: 'success',
           event_type: 'message_created_public',
           latency_ms: Date.now() - startTime,
+          payload: rawPayload,
         });
 
         return new Response(
@@ -923,6 +928,7 @@ Deno.serve(async (req) => {
         event_type: 'auto_heal_denied',
         error_message: 'Sem critério de classificação válido',
         latency_ms: Date.now() - startTime,
+        payload: rawPayload,
       });
 
       return new Response(
@@ -977,6 +983,7 @@ Deno.serve(async (req) => {
           event_type: 'note_created',
           error_message: atividadeError.message,
           latency_ms: Date.now() - startTime,
+          payload: rawPayload,
         });
         
         return new Response(
@@ -1011,6 +1018,7 @@ Deno.serve(async (req) => {
       event_type: eventType,
       error_message: `Event type '${eventType}' not handled`,
       latency_ms: Date.now() - startTime,
+      payload: rawPayload,
     });
 
     return new Response(
