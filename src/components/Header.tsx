@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, ListTodo, Menu } from "lucide-react";
+import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, ListTodo, Menu, Code } from "lucide-react";
 import { useSystemHealth } from "@/hooks/useSystemHealth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { ThemeToggle } from "./ThemeToggle";
 
 const getInitials = (name: string): string => {
   if (!name) return "?";
@@ -52,6 +53,7 @@ export const Header = () => {
     { path: "/atividades", label: "Atividades", icon: ListTodo },
     { path: "/dashboard-comercial", label: "Comercial", icon: BarChart3 },
     { path: "/dashboard-administrativo", label: "Administrativo", icon: Wrench },
+    { path: "/api-docs", label: "API Docs", icon: Code, requireAdmin: true },
     { path: "/configuracoes", label: "Configurações", icon: Settings, requireAdmin: true },
   ];
 
@@ -120,8 +122,10 @@ export const Header = () => {
             })}
           </nav>
 
-          {/* User Avatar */}
-          <div className="flex items-center gap-3">
+          {/* Theme Toggle & User Avatar */}
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

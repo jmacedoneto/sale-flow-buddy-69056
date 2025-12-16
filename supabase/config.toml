@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.api-key-auth]
 verify_jwt = false
+
+[functions.cards-api]
+verify_jwt = false
