@@ -194,6 +194,7 @@ export type Database = {
           resumo_generated_at: string | null
           sla_vencimento: string | null
           status: string | null
+          telefone_lead: string | null
           titulo: string
           updated_at: string
           valor_total: number | null
@@ -220,6 +221,7 @@ export type Database = {
           resumo_generated_at?: string | null
           sla_vencimento?: string | null
           status?: string | null
+          telefone_lead?: string | null
           titulo: string
           updated_at?: string
           valor_total?: number | null
@@ -246,6 +248,7 @@ export type Database = {
           resumo_generated_at?: string | null
           sla_vencimento?: string | null
           status?: string | null
+          telefone_lead?: string | null
           titulo?: string
           updated_at?: string
           valor_total?: number | null
@@ -748,6 +751,7 @@ export type Database = {
         Row: {
           approved: boolean | null
           ativo: boolean | null
+          avatar_url: string | null
           created_at: string | null
           criar_card: boolean | null
           deletar_card: boolean | null
@@ -767,6 +771,7 @@ export type Database = {
         Insert: {
           approved?: boolean | null
           ativo?: boolean | null
+          avatar_url?: string | null
           created_at?: string | null
           criar_card?: boolean | null
           deletar_card?: boolean | null
@@ -786,6 +791,7 @@ export type Database = {
         Update: {
           approved?: boolean | null
           ativo?: boolean | null
+          avatar_url?: string | null
           created_at?: string | null
           criar_card?: boolean | null
           deletar_card?: boolean | null

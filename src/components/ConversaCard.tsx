@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Clock } from "lucide-react";
+import { MessageSquare, Clock, User } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSortable } from "@dnd-kit/sortable";
@@ -9,9 +9,11 @@ import type { StatusInfo } from "@/services/cardStatusService";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, XCircle, Pause } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 import { CardStatusModal } from "./CardStatusModal";
 import { useCardStatus, type CardStatus } from "@/hooks/useCardStatus";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ConversaCardProps {
   id: string;
@@ -21,10 +23,21 @@ interface ConversaCardProps {
   createdAt: string;
   statusInfo: StatusInfo;
   funilId?: string;
+  assignedTo?: string | null;
   onClick?: () => void;
   onAgendarClick?: () => void;
   onFollowUpCreated?: () => void;
 }
+
+// Helper para extrair iniciais do nome
+const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
 
 export const ConversaCard = ({
   id,
@@ -34,6 +47,7 @@ export const ConversaCard = ({
   createdAt,
   statusInfo,
   funilId,
+  assignedTo,
   onClick,
   onAgendarClick,
   onFollowUpCreated,
@@ -45,6 +59,7 @@ export const ConversaCard = ({
   } | null>(null);
   const [statusModalOpen, setStatusModalOpen] = useState(false);
   const [selectedStatus, setSelectedStatus] = useState<CardStatus | null>(null);
+  const [responsavel, setResponsavel] = useState<{ nome: string; avatar_url: string | null } | null>(null);
   
   const {
     attributes,
@@ -60,6 +75,28 @@ export const ConversaCard = ({
     transition,
     opacity: isDragging ? 0.5 : 1,
   };
+
+  // Buscar dados do responsável
+  useEffect(() => {
+    const fetchResponsavel = async () => {
+      if (!assignedTo) {
+        setResponsavel(null);
+        return;
+      }
+
+      const { data } = await supabase
+        .from('users_crm')
+        .select('nome, avatar_url')
+        .eq('id', assignedTo)
+        .single();
+
+      if (data) {
+        setResponsavel(data);
+      }
+    };
+
+    fetchResponsavel();
+  }, [assignedTo]);
 
   // Buscar atividade pendente mais próxima
   useEffect(() => {
@@ -114,8 +151,8 @@ export const ConversaCard = ({
     if (vencida) {
       return (
         <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-xs text-red-600 font-medium">
+          <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+          <span className="text-xs text-destructive font-medium">
             {Math.abs(diasRestantes)} {Math.abs(diasRestantes) === 1 ? 'dia vencido' : 'dias vencidos'}
           </span>
         </div>
@@ -125,8 +162,8 @@ export const ConversaCard = ({
     if (diasRestantes === 0) {
       return (
         <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
-          <span className="text-xs text-yellow-600 font-medium">Hoje</span>
+          <div className="h-2 w-2 rounded-full bg-warning animate-pulse" />
+          <span className="text-xs text-warning font-medium">Hoje</span>
         </div>
       );
     }
@@ -134,8 +171,8 @@ export const ConversaCard = ({
     if (diasRestantes > 0 && diasRestantes <= 3) {
       return (
         <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-green-500" />
-          <span className="text-xs text-green-600 font-medium">
+          <div className="h-2 w-2 rounded-full bg-success" />
+          <span className="text-xs text-success font-medium">
             {diasRestantes} {diasRestantes === 1 ? 'dia' : 'dias'}
           </span>
         </div>
@@ -167,34 +204,48 @@ export const ConversaCard = ({
     );
   };
 
+  // Avatar do Lead (iniciais do título)
+  const leadInitials = getInitials(titulo);
+
   return (
     <Card
       ref={setNodeRef}
       style={style}
       {...attributes}
       {...listeners}
-      className="p-4 cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 transition-all duration-200 bg-gradient-card border-border group"
+      className="p-4 cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 transition-all duration-200 bg-gradient-card border-border group relative"
       onClick={handleClick}
     >
       <div className="space-y-2">
-        <div className="flex items-start justify-between gap-2">
-          <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors">
-            {titulo}
-          </h4>
-          {chatwootConversaId && (
-            <Badge variant="outline" className="text-xs shrink-0">
-              #{chatwootConversaId}
-            </Badge>
-          )}
+        {/* Header com Avatar do Lead */}
+        <div className="flex items-start gap-3">
+          <Avatar className="h-9 w-9 shrink-0 border-2 border-primary/20">
+            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+              {leadInitials}
+            </AvatarFallback>
+          </Avatar>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+                {titulo}
+              </h4>
+              {chatwootConversaId && (
+                <Badge variant="outline" className="text-xs shrink-0">
+                  #{chatwootConversaId}
+                </Badge>
+              )}
+            </div>
+          </div>
         </div>
         
         {resumo && (
-          <p className="text-xs text-muted-foreground line-clamp-2">
+          <p className="text-xs text-muted-foreground line-clamp-2 pl-12">
             {resumo}
           </p>
         )}
         
-        <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
+        <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 pl-12">
           <div className="flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
             <span>Conversa</span>
@@ -222,7 +273,7 @@ export const ConversaCard = ({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-green-600 hover:bg-green-50 hover:text-green-700"
+            className="flex-1 text-success hover:bg-success/10 hover:text-success hover:border-success/30"
             onClick={(e) => handleStatusClick(e, 'ganho')}
           >
             <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -231,7 +282,7 @@ export const ConversaCard = ({
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-red-600 hover:bg-red-50 hover:text-red-700"
+            className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
             onClick={(e) => handleStatusClick(e, 'perdido')}
           >
             <XCircle className="h-3 w-3 mr-1" />
@@ -252,6 +303,29 @@ export const ConversaCard = ({
           />
         )}
       </div>
+
+      {/* Avatar do Responsável no canto inferior direito */}
+      {responsavel && (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="absolute bottom-2 right-2">
+                <Avatar className="h-6 w-6 border border-border shadow-sm">
+                  {responsavel.avatar_url ? (
+                    <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
+                  ) : null}
+                  <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+                    {getInitials(responsavel.nome || '')}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p className="text-xs">{responsavel.nome || 'Responsável'}</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      )}
     </Card>
   );
 };

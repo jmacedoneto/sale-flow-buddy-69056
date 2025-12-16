@@ -101,6 +101,8 @@ export const EtapaColumn = ({
                 chatwootConversaId={card.chatwoot_conversa_id || undefined}
                 createdAt={card.created_at || new Date().toISOString()}
                 statusInfo={card.statusInfo}
+                funilId={card.funil_id || undefined}
+                assignedTo={(card as any).assigned_to}
                 onClick={() => onCardClick?.(card)}
                 onAgendarClick={() => onAgendarClick?.(card)}
               />
