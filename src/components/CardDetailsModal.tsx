@@ -487,36 +487,42 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
           {/* Sidebar - 30% */}
           <ScrollArea className="w-full lg:w-[30%] bg-muted/20">
             <div className="p-6 space-y-6">
-              {/* Resumo Comercial */}
-              {resumoComercial && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary" />
-                    Resumo Comercial
+              {/* RESUMO COMERCIAL IA - TOPO DA SIDEBAR (destacado) */}
+              <div className="space-y-3 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-semibold text-lg flex items-center gap-2 text-primary">
+                    <Sparkles className="h-5 w-5" />
+                    Resumo Comercial IA
                   </h3>
-                  <div className="bg-card rounded-lg p-4 border border-border">
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {resumoComercial}
-                    </p>
-                  </div>
+                  {card.chatwoot_conversa_id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleGerarResumo}
+                      disabled={isGeneratingResumo}
+                      className="text-primary hover:text-primary/80"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isGeneratingResumo ? 'animate-spin' : ''}`} />
+                    </Button>
+                  )}
                 </div>
-              )}
-
-              {isGeneratingResumo && (
-                <div className="space-y-3">
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    <Sparkles className="h-5 w-5 text-primary animate-pulse" />
-                    Gerando Resumo...
-                  </h3>
-                  <div className="bg-card rounded-lg p-4 border border-border">
-                    <div className="space-y-2">
-                      <div className="h-3 bg-muted animate-pulse rounded" />
-                      <div className="h-3 bg-muted animate-pulse rounded w-4/5" />
-                      <div className="h-3 bg-muted animate-pulse rounded w-3/5" />
-                    </div>
+                
+                {isGeneratingResumo ? (
+                  <div className="space-y-2">
+                    <div className="h-3 bg-primary/20 animate-pulse rounded" />
+                    <div className="h-3 bg-primary/20 animate-pulse rounded w-4/5" />
+                    <div className="h-3 bg-primary/20 animate-pulse rounded w-3/5" />
                   </div>
-                </div>
-              )}
+                ) : resumoComercial ? (
+                  <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                    {resumoComercial}
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">
+                    Clique no botão para gerar um resumo com IA
+                  </p>
+                )}
+              </div>
 
               <Separator />
 

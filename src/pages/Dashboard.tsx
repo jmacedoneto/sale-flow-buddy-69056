@@ -75,7 +75,7 @@ const Dashboard = () => {
   const { data: funis, isLoading: isLoadingFunis } = useFunis();
   const { data: etapas, isLoading: isLoadingEtapas } = useEtapas(selectedFunilId);
   
-  // GRUPO A.1: Passar filtros para o hook
+  // Passar filtros para o hook
   const { data: cardsData, isLoading: isLoadingCards } = useAllCardsForFunil(
     selectedFunilId, 
     currentPage, 
@@ -86,6 +86,9 @@ const Dashboard = () => {
       productId: filters.productId,
       openedFrom: filters.openedFrom,
       openedTo: filters.openedTo,
+      etapaId: filters.etapaId,
+      assignedTo: filters.assignedTo,
+      verMeus: filters.verMeus,
     }
   );
   const allCards = cardsData?.cards;
@@ -512,6 +515,7 @@ const Dashboard = () => {
         <PipelineFilters
           filters={filters}
           setFilters={setFilters}
+          selectedFunilId={selectedFunilId}
           onClear={() => setFilters({
             status: 'ativo',
             leadName: '',
@@ -519,6 +523,9 @@ const Dashboard = () => {
             openedFrom: null,
             openedTo: null,
             funilId: null,
+            etapaId: null,
+            assignedTo: null,
+            verMeus: false,
           })}
         />
 

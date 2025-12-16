@@ -74,6 +74,9 @@ export const useAllCardsForFunil = (
     productId?: string | null;
     openedFrom?: string | null;
     openedTo?: string | null;
+    etapaId?: string | null;       // NOVO: Filtro por etapa
+    assignedTo?: string | null;    // NOVO: Filtro por responsável
+    verMeus?: boolean;             // NOVO: Toggle "Ver Meus"
   }
 ) => {
   return useQuery<{ cards: CardWithStatus[]; totalCount: number }>({
@@ -81,14 +84,14 @@ export const useAllCardsForFunil = (
     queryFn: async () => {
       if (!funilId) return { cards: [], totalCount: 0 };
       
-      // GRUPO A.1 + A.2: Query com filtros e exclusão de arquivados
+      // Query com filtros e exclusão de arquivados
       let query = supabase
         .from("cards_conversas")
         .select('*', { count: 'exact' })
         .eq('funil_id', funilId)
         .eq('arquivado', false);
       
-      // A.1: Filtro de status da oportunidade
+      // Filtro de status da oportunidade
       if (filters?.status && filters.status !== 'todos') {
         if (filters.status === 'ativo') {
           query = query.eq('status', 'em_andamento').eq('pausado', false);
@@ -101,12 +104,22 @@ export const useAllCardsForFunil = (
         }
       }
       
-      // A.1: Filtro de nome do lead
+      // Filtro de nome do lead
       if (filters?.leadName) {
         query = query.ilike('titulo', `%${filters.leadName}%`);
       }
       
-      // A.1: Filtro de data de abertura
+      // NOVO: Filtro por etapa
+      if (filters?.etapaId) {
+        query = query.eq('etapa_id', filters.etapaId);
+      }
+      
+      // NOVO: Filtro por responsável (assigned_to)
+      if (filters?.assignedTo) {
+        query = query.eq('assigned_to', filters.assignedTo);
+      }
+      
+      // Filtro de data de abertura
       if (filters?.openedFrom) {
         query = query.gte('created_at', filters.openedFrom);
       }

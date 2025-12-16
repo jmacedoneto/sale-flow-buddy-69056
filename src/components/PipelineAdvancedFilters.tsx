@@ -52,6 +52,9 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
       funilId: funil || null,
       openedFrom: dataInicio || null,
       openedTo: dataFim || null,
+      etapaId: null,
+      assignedTo: null,
+      verMeus: false,
     };
     
     // Salvar filtros no localStorage
@@ -85,6 +88,9 @@ export const PipelineAdvancedFilters = ({ onFiltersChange }: PipelineAdvancedFil
       funilId: null,
       openedFrom: null,
       openedTo: null,
+      etapaId: null,
+      assignedTo: null,
+      verMeus: false,
     });
   };
 

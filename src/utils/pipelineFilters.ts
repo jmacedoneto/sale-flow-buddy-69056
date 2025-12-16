@@ -8,6 +8,9 @@ export interface PipelineFilters {
   openedFrom: string | null;
   openedTo: string | null;
   funilId: string | null;
+  etapaId: string | null;        // NOVO: Filtro por etapa
+  assignedTo: string | null;     // NOVO: Filtro por responsável
+  verMeus: boolean;              // NOVO: Toggle "Ver Meus"
 }
 
 export const usePipelineFilters = () => {
@@ -18,6 +21,9 @@ export const usePipelineFilters = () => {
     openedFrom: null,
     openedTo: null,
     funilId: null,
+    etapaId: null,
+    assignedTo: null,
+    verMeus: false,
   });
 
   const applyFilters = (cards: CardConversa[]): CardConversa[] => {
@@ -37,6 +43,11 @@ export const usePipelineFilters = () => {
 
       // Filtro de funil
       if (filters.funilId && card.funil_id !== filters.funilId) {
+        return false;
+      }
+
+      // Filtro de etapa
+      if (filters.etapaId && card.etapa_id !== filters.etapaId) {
         return false;
       }
 
