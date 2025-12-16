@@ -174,7 +174,7 @@ export function EtapasModal({ open, onOpenChange, funilId, etapas = [] }: Etapas
           ordem: index + 1,
         }));
         
-        reorderEtapas.mutate({ updates });
+        reorderEtapas.mutate(updates);
         
         return newOrder;
       });

@@ -3,13 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Clock, Copy, ExternalLink } from "lucide-react";
+import { Clock, Copy, ExternalLink, GripVertical } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { DndContext, closestCenter, DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
+import { DndContext, DragEndEvent, PointerSensor, useSensor, useSensors, useDraggable, useDroppable } from "@dnd-kit/core";
 import { toast } from "sonner";
 import { AtividadeDetailsModal } from "./AtividadeDetailsModal";
 import { useNavigate } from "react-router-dom";
+import { Badge } from "./ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 interface AtividadesAdminKanbanProps {
   searchTerm: string;
@@ -18,9 +20,9 @@ interface AtividadesAdminKanbanProps {
 }
 
 const statusColumns = [
-  { id: 'pendente', label: 'Demanda Aberta', bgColor: 'bg-red-50 dark:bg-red-950/30', headerBg: 'bg-red-500', borderColor: 'border-red-300' },
-  { id: 'em_andamento', label: 'Em Resolução', bgColor: 'bg-yellow-50 dark:bg-yellow-950/30', headerBg: 'bg-yellow-500', borderColor: 'border-yellow-300' },
-  { id: 'concluida', label: 'Concluído', bgColor: 'bg-green-50 dark:bg-green-950/30', headerBg: 'bg-green-500', borderColor: 'border-green-300' },
+  { id: 'pendente', label: 'Demanda Aberta', bgColor: 'bg-destructive/5', headerBg: 'bg-destructive', borderColor: 'border-destructive/30' },
+  { id: 'em_andamento', label: 'Em Resolução', bgColor: 'bg-warning/5', headerBg: 'bg-warning', borderColor: 'border-warning/30' },
+  { id: 'concluida', label: 'Concluído', bgColor: 'bg-success/5', headerBg: 'bg-success', borderColor: 'border-success/30' },
 ];
 
 const DroppableColumn = ({ id, children }: { id: string; children: React.ReactNode }) => {
@@ -28,7 +30,9 @@ const DroppableColumn = ({ id, children }: { id: string; children: React.ReactNo
   return (
     <div 
       ref={setNodeRef} 
-      className={`min-h-[300px] p-2 rounded-b-lg transition-colors ${isOver ? 'bg-primary/10' : 'bg-muted/30'}`}
+      className={`min-h-[300px] p-3 rounded-b-xl transition-all duration-200 ${
+        isOver ? 'bg-primary/10 ring-2 ring-primary/30' : 'bg-muted/20'
+      }`}
     >
       {children}
     </div>
@@ -50,39 +54,81 @@ const DraggableCard = ({ atividade, onClick, onCopyPhone }: {
   } : undefined;
 
   const telefone = atividade.cards_conversas?.telefone_lead;
+  const leadInitials = atividade.cards_conversas?.titulo 
+    ? atividade.cards_conversas.titulo.substring(0, 2).toUpperCase() 
+    : "??";
 
   return (
-    <Card ref={setNodeRef} style={style} className="mb-3 hover:shadow-md transition-shadow">
+    <Card 
+      ref={setNodeRef} 
+      style={style} 
+      className="mb-3 hover:shadow-lg transition-all duration-200 bg-card/80 backdrop-blur-sm border-border/50 rounded-xl overflow-hidden"
+    >
+      {/* Drag Handle */}
+      <div 
+        {...listeners} 
+        {...attributes} 
+        className="h-5 bg-muted/50 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted border-b border-border/30"
+      >
+        <GripVertical className="h-3 w-3 text-muted-foreground/50" />
+      </div>
+
       <CardContent className="p-4">
-        {/* Drag handle */}
-        <div {...listeners} {...attributes} className="cursor-grab active:cursor-grabbing mb-2 p-1 -m-1 rounded hover:bg-muted">
-          <div className="h-1 w-8 mx-auto bg-muted-foreground/30 rounded" />
-        </div>
-        
-        <div className="flex flex-col gap-2">
-          <div onClick={onClick} className="cursor-pointer">
-            <p className="font-medium text-sm">{atividade.cards_conversas?.titulo || 'Sem título'}</p>
-            <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{atividade.descricao}</p>
+        <div className="flex flex-col gap-3">
+          {/* Header com Avatar */}
+          <div className="flex items-start gap-3 cursor-pointer" onClick={onClick}>
+            <Avatar className="h-9 w-9 shrink-0 border-2 border-primary/20">
+              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
+                {leadInitials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm line-clamp-1 hover:text-primary transition-colors">
+                {atividade.cards_conversas?.titulo || 'Atividade avulsa'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                {atividade.descricao}
+              </p>
+            </div>
           </div>
           
+          {/* Badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs bg-secondary px-2 py-1 rounded">{atividade.tipo}</span>
+            <Badge variant="secondary" className="text-[10px]">
+              {atividade.tipo}
+            </Badge>
             {atividade.data_prevista && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
+              <span className="text-[10px] text-muted-foreground flex items-center gap-1">
                 <Clock className="h-3 w-3" />
                 {format(new Date(atividade.data_prevista), "dd/MM", { locale: ptBR })}
               </span>
             )}
+            {!atividade.card_id && (
+              <Badge variant="outline" className="text-[10px] text-warning border-warning/30">
+                Avulsa
+              </Badge>
+            )}
           </div>
 
-          <div className="flex items-center gap-1 mt-1">
+          {/* Actions */}
+          <div className="flex items-center gap-1 pt-2 border-t border-border/30">
             {telefone && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); onCopyPhone(telefone); }}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-xs" 
+                onClick={(e) => { e.stopPropagation(); onCopyPhone(telefone); }}
+              >
                 <Copy className="h-3 w-3 mr-1" />{telefone}
               </Button>
             )}
             {atividade.card_id && (
-              <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/dashboard?cardId=${atividade.card_id}`); }}>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-7 text-xs" 
+                onClick={(e) => { e.stopPropagation(); navigate(`/dashboard?cardId=${atividade.card_id}`); }}
+              >
                 <ExternalLink className="h-3 w-3 mr-1" />Ver Card
               </Button>
             )}
@@ -96,13 +142,22 @@ const DraggableCard = ({ atividade, onClick, onCopyPhone }: {
 export const AtividadesAdminKanban = ({ searchTerm, mostrarConcluidas, userId }: AtividadesAdminKanbanProps) => {
   const [selectedAtividade, setSelectedAtividade] = useState<any | null>(null);
   const queryClient = useQueryClient();
+
+  // Sensor com distance constraint para evitar conflitos com cliques
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 10,
+      },
+    })
+  );
   
   const { data: atividades = [], isLoading, refetch } = useQuery({
     queryKey: ['atividades-admin', mostrarConcluidas, searchTerm, userId],
     queryFn: async () => {
       let query = supabase
         .from('atividades_cards')
-        .select(`*, cards_conversas(id, titulo, telefone_lead, chatwoot_conversa_id)`)
+        .select(`*, cards_conversas(id, titulo, telefone_lead, chatwoot_conversa_id, funil_nome)`)
         .order('data_prevista', { ascending: true });
 
       if (!mostrarConcluidas) query = query.neq('status', 'concluida');
@@ -155,20 +210,34 @@ export const AtividadesAdminKanban = ({ searchTerm, mostrarConcluidas, userId }:
 
   return (
     <>
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
           {statusColumns.map((column) => {
             const columnAtividades = getAtividadesByStatus(column.id);
             return (
-              <div key={column.id} className={`rounded-lg border-2 ${column.borderColor} ${column.bgColor}`}>
-                <div className={`p-3 rounded-t-md ${column.headerBg}`}>
-                  <h3 className="font-semibold text-white">{column.label} ({columnAtividades.length})</h3>
+              <div key={column.id} className={`rounded-xl border-2 ${column.borderColor} ${column.bgColor} overflow-hidden`}>
+                <div className={`p-3 ${column.headerBg}`}>
+                  <h3 className="font-semibold text-white flex items-center justify-between">
+                    {column.label}
+                    <Badge variant="secondary" className="bg-white/20 text-white">
+                      {columnAtividades.length}
+                    </Badge>
+                  </h3>
                 </div>
                 <DroppableColumn id={column.id}>
                   {columnAtividades.map((atividade) => (
-                    <DraggableCard key={atividade.id} atividade={atividade} onClick={() => setSelectedAtividade(atividade)} onCopyPhone={handleCopyPhone} />
+                    <DraggableCard 
+                      key={atividade.id} 
+                      atividade={atividade} 
+                      onClick={() => setSelectedAtividade(atividade)} 
+                      onCopyPhone={handleCopyPhone} 
+                    />
                   ))}
-                  {columnAtividades.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">Nenhuma atividade</p>}
+                  {columnAtividades.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-8 border border-dashed border-border/50 rounded-lg">
+                      Nenhuma atividade
+                    </p>
+                  )}
                 </DroppableColumn>
               </div>
             );
@@ -177,7 +246,12 @@ export const AtividadesAdminKanban = ({ searchTerm, mostrarConcluidas, userId }:
       </DndContext>
 
       {selectedAtividade && (
-        <AtividadeDetailsModal isOpen={!!selectedAtividade} onClose={() => setSelectedAtividade(null)} atividade={selectedAtividade} onSuccess={() => { refetch(); setSelectedAtividade(null); }} />
+        <AtividadeDetailsModal 
+          isOpen={!!selectedAtividade} 
+          onClose={() => setSelectedAtividade(null)} 
+          atividade={selectedAtividade} 
+          onSuccess={() => { refetch(); setSelectedAtividade(null); }} 
+        />
       )}
     </>
   );

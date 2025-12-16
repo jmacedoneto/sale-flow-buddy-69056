@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Clock } from "lucide-react";
+import { MessageSquare, Clock, GripVertical } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSortable } from "@dnd-kit/sortable";
@@ -128,12 +128,17 @@ export const ConversaCard = ({
   }, [id]);
 
   const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
+    // Não propagar se clicou em botão ou drag handle
+    if ((e.target as HTMLElement).closest('button') || 
+        (e.target as HTMLElement).closest('[data-drag-handle]')) {
+      return;
+    }
     onClick?.();
   };
 
   const handleStatusClick = (e: React.MouseEvent, status: CardStatus) => {
     e.stopPropagation();
+    e.preventDefault();
     setSelectedStatus(status);
     setStatusModalOpen(true);
   };
@@ -194,15 +199,23 @@ export const ConversaCard = ({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      {...listeners}
-      className="p-4 cursor-grab active:cursor-grabbing 
+      className="p-0 
         hover:shadow-xl hover:scale-[1.02] hover:border-primary/30 
         transition-all duration-200 
         bg-card/80 backdrop-blur-sm border-border/50 
-        group relative rounded-xl"
+        group relative rounded-xl overflow-hidden"
       onClick={handleClick}
     >
-      <div className="space-y-3">
+      {/* Drag Handle - Área separada para arrastar */}
+      <div 
+        {...listeners}
+        data-drag-handle
+        className="h-6 bg-muted/50 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted border-b border-border/30"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground/50" />
+      </div>
+
+      <div className="p-4 space-y-3">
         {/* Header com Avatar do Lead */}
         <div className="flex items-start gap-3">
           <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
@@ -216,7 +229,7 @@ export const ConversaCard = ({
           
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+              <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer">
                 {titulo}
               </h4>
               {chatwootConversaId && (
@@ -259,7 +272,7 @@ export const ConversaCard = ({
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons - Separados do drag */}
         <div className="flex gap-2 pt-2">
           <Button
             size="sm"
