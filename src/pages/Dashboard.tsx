@@ -34,9 +34,8 @@ import { useKanbanColors } from "@/hooks/useKanbanColors";
 import { ListaCards } from "@/components/dashboard/ListaCards";
 import { useCardSelection } from "@/hooks/useCardSelection";
 import { BulkActionsBar } from "@/components/BulkActionsBar";
-import { WorkspaceLayout } from "@/components/dashboard/WorkspaceLayout";
 
-type ViewMode = 'workspace' | 'kanban' | 'table';
+type ViewMode = 'kanban' | 'table';
 
 const Dashboard = () => {
   const queryClient = useQueryClient();
@@ -56,10 +55,10 @@ const Dashboard = () => {
   const pageSize = 50;
   const [isTestingCycle, setIsTestingCycle] = useState(false);
   
-  // MÓDULO 2: Estado de ViewMode com persistência
+  // Estado de ViewMode com persistência
   const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem('dashboard_view_mode');
-    return (saved as ViewMode) || 'workspace';
+    return (saved as ViewMode) === 'table' ? 'table' : 'kanban';
   });
   
   // MÓDULO 3: Hook de seleção em massa
@@ -425,12 +424,6 @@ const Dashboard = () => {
     if (!allCards) return 0;
     return allCards.length;
   };
-  // Stats para WorkspaceLayout
-  const workspaceStats = {
-    totalDeals: statsData.totalConversas,
-    won: statsData.vendasFechadas,
-    lost: allCards?.filter(c => c.status === 'perdido').length || 0,
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -451,15 +444,6 @@ const Dashboard = () => {
               
               {/* View Mode Toggle */}
               <div className="flex items-center border border-border/50 rounded-xl bg-muted/30 p-1">
-                <Button 
-                  variant={viewMode === 'workspace' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('workspace')}
-                  className="rounded-lg gap-1"
-                >
-                  <LayoutDashboard className="h-4 w-4" />
-                  Workspace
-                </Button>
                 <Button 
                   variant={viewMode === 'kanban' ? 'default' : 'ghost'}
                   size="sm"
@@ -500,39 +484,28 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-6 py-8">
-        {/* Workspace View */}
-        {viewMode === 'workspace' ? (
-          <WorkspaceLayout
-            cards={allCards || []}
-            onCardClick={handleCardClick}
-            onNewCard={() => setIsCreateModalOpen(true)}
-            stats={workspaceStats}
-            isLoading={isLoadingCards}
-          />
-        ) : (
-          <>
-            {/* Stats Grid */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
-              {stats.map((stat) => {
-                const Icon = stat.icon;
-                return (
-                  <Card key={stat.title} className="shadow-card transition-shadow hover:shadow-elegant">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        {stat.title}
-                      </CardTitle>
-                      <Icon className={`h-4 w-4 ${stat.color}`} />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-3xl font-bold text-foreground">{stat.value}</div>
-                      <p className={`text-xs mt-1 ${stat.trend === 'up' ? 'text-success' : 'text-destructive'}`}>
-                        {stat.change} comparado ao mês anterior
-                      </p>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+        {/* Stats Grid */}
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4 mb-8">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <Card key={stat.title} className="shadow-card transition-shadow hover:shadow-elegant">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {stat.title}
+                  </CardTitle>
+                  <Icon className={`h-4 w-4 ${stat.color}`} />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-foreground">{stat.value}</div>
+                  <p className={`text-xs mt-1 ${stat.trend === 'up' ? 'text-success' : 'text-destructive'}`}>
+                    {stat.change} comparado ao mês anterior
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
 
         {/* Alerta de cards sem tarefa */}
         {semTarefasCount !== undefined && semTarefasCount > 0 && (
@@ -840,8 +813,6 @@ const Dashboard = () => {
               </div>
             )}
           </Card>
-        )}
-          </>
         )}
       </main>
 

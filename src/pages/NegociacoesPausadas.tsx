@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Header } from "@/components/Header";
 import { ConversaCard } from "@/components/ConversaCard";
 import { CardDetailsModal } from "@/components/CardDetailsModal";
 import { CardConversa } from "@/types/database";
@@ -32,7 +31,6 @@ export default function NegociacoesPausadas() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header />
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
