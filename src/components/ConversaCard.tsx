@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Clock, User } from "lucide-react";
+import { MessageSquare, Clock } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useSortable } from "@dnd-kit/sortable";
@@ -31,7 +31,6 @@ interface ConversaCardProps {
   onFollowUpCreated?: () => void;
 }
 
-// Helper para extrair iniciais do nome
 const getInitials = (name: string): string => {
   if (!name) return "?";
   const parts = name.trim().split(" ");
@@ -51,10 +50,7 @@ export const ConversaCard = ({
   funilId,
   assignedTo,
   avatarLeadUrl,
-  avatarAgenteUrl,
   onClick,
-  onAgendarClick,
-  onFollowUpCreated,
 }: ConversaCardProps) => {
   const [atividadeStatus, setAtividadeStatus] = useState<{
     vencida: boolean;
@@ -136,11 +132,6 @@ export const ConversaCard = ({
     onClick?.();
   };
 
-  const handleAgendarClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    onAgendarClick?.();
-  };
-
   const handleStatusClick = (e: React.MouseEvent, status: CardStatus) => {
     e.stopPropagation();
     setSelectedStatus(status);
@@ -154,10 +145,10 @@ export const ConversaCard = ({
 
     if (vencida) {
       return (
-        <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
-          <span className="text-xs text-destructive font-medium">
-            {Math.abs(diasRestantes)} {Math.abs(diasRestantes) === 1 ? 'dia vencido' : 'dias vencidos'}
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-destructive/10">
+          <div className="h-1.5 w-1.5 rounded-full bg-destructive animate-pulse" />
+          <span className="text-[10px] text-destructive font-medium">
+            {Math.abs(diasRestantes)}d vencido
           </span>
         </div>
       );
@@ -165,19 +156,19 @@ export const ConversaCard = ({
 
     if (diasRestantes === 0) {
       return (
-        <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-warning animate-pulse" />
-          <span className="text-xs text-warning font-medium">Hoje</span>
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-warning/10">
+          <div className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+          <span className="text-[10px] text-warning font-medium">Hoje</span>
         </div>
       );
     }
 
     if (diasRestantes > 0 && diasRestantes <= 3) {
       return (
-        <div className="flex items-center gap-1">
-          <div className="h-2 w-2 rounded-full bg-success" />
-          <span className="text-xs text-success font-medium">
-            {diasRestantes} {diasRestantes === 1 ? 'dia' : 'dias'}
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-success/10">
+          <div className="h-1.5 w-1.5 rounded-full bg-success" />
+          <span className="text-[10px] text-success font-medium">
+            {diasRestantes}d
           </span>
         </div>
       );
@@ -187,28 +178,15 @@ export const ConversaCard = ({
   };
 
   const renderStatusBadge = () => {
-    const { status, variant, label } = statusInfo;
-
-    if (status === 'sem') {
-      return (
-        <div className="flex items-center gap-2 pt-2 border-t border-border">
-          <Badge variant={variant} className="text-xs flex items-center gap-1">
-            {label}
-          </Badge>
-        </div>
-      );
-    }
+    const { variant, label } = statusInfo;
 
     return (
-      <div className="pt-2 border-t border-border">
-        <Badge variant={variant} className="text-xs w-fit">
-          {label}
-        </Badge>
-      </div>
+      <Badge variant={variant} className="text-[10px] px-2 py-0.5 font-medium">
+        {label}
+      </Badge>
     );
   };
 
-  // Avatar do Lead (iniciais do título)
   const leadInitials = getInitials(titulo);
 
   return (
@@ -217,17 +195,21 @@ export const ConversaCard = ({
       style={style}
       {...attributes}
       {...listeners}
-      className="p-4 cursor-grab active:cursor-grabbing hover:shadow-lg hover:scale-[1.02] hover:border-primary/30 transition-all duration-200 bg-gradient-card border-border group relative"
+      className="p-4 cursor-grab active:cursor-grabbing 
+        hover:shadow-xl hover:scale-[1.02] hover:border-primary/30 
+        transition-all duration-200 
+        bg-card/80 backdrop-blur-sm border-border/50 
+        group relative rounded-xl"
       onClick={handleClick}
     >
-      <div className="space-y-2">
+      <div className="space-y-3">
         {/* Header com Avatar do Lead */}
         <div className="flex items-start gap-3">
-          <Avatar className="h-9 w-9 shrink-0 border-2 border-primary/20">
+          <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
             {avatarLeadUrl ? (
               <AvatarImage src={avatarLeadUrl} alt={titulo} />
             ) : null}
-            <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
               {leadInitials}
             </AvatarFallback>
           </Avatar>
@@ -238,7 +220,7 @@ export const ConversaCard = ({
                 {titulo}
               </h4>
               {chatwootConversaId && (
-                <Badge variant="outline" className="text-xs shrink-0">
+                <Badge variant="outline" className="text-[10px] shrink-0 font-normal">
                   #{chatwootConversaId}
                 </Badge>
               )}
@@ -247,12 +229,13 @@ export const ConversaCard = ({
         </div>
         
         {resumo && (
-          <p className="text-xs text-muted-foreground line-clamp-2 pl-12">
+          <p className="text-xs text-muted-foreground line-clamp-2 pl-[52px]">
             {resumo}
           </p>
         )}
         
-        <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1 pl-12">
+        {/* Meta info */}
+        <div className="flex items-center gap-3 text-[10px] text-muted-foreground pl-[52px]">
           <div className="flex items-center gap-1">
             <MessageSquare className="h-3 w-3" />
             <span>Conversa</span>
@@ -268,31 +251,32 @@ export const ConversaCard = ({
           </div>
         </div>
 
-        <div className="flex items-center justify-between mt-2">
+        {/* Status Row */}
+        <div className="flex items-center justify-between pt-2 border-t border-border/50">
           <div className="flex items-center gap-2">
             {renderAtividadeBadge()}
             {renderStatusBadge()}
           </div>
         </div>
 
-        {/* Botões de Status */}
-        <div className="flex gap-2 mt-3 pt-3 border-t">
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-2">
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-success hover:bg-success/10 hover:text-success hover:border-success/30"
+            className="flex-1 h-8 text-xs text-success hover:bg-success/10 hover:text-success hover:border-success/30 rounded-lg"
             onClick={(e) => handleStatusClick(e, 'ganho')}
           >
-            <CheckCircle2 className="h-3 w-3 mr-1" />
+            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
             Ganho
           </Button>
           <Button
             size="sm"
             variant="outline"
-            className="flex-1 text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+            className="flex-1 h-8 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30 rounded-lg"
             onClick={(e) => handleStatusClick(e, 'perdido')}
           >
-            <XCircle className="h-3 w-3 mr-1" />
+            <XCircle className="h-3.5 w-3.5 mr-1" />
             Perdido
           </Button>
         </div>
@@ -311,17 +295,17 @@ export const ConversaCard = ({
         )}
       </div>
 
-      {/* Avatar do Responsável no canto inferior direito */}
+      {/* Avatar do Responsável */}
       {responsavel && (
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <div className="absolute bottom-2 right-2">
+              <div className="absolute bottom-3 right-3">
                 <Avatar className="h-6 w-6 border border-border shadow-sm">
                   {responsavel.avatar_url ? (
                     <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
                   ) : null}
-                  <AvatarFallback className="bg-muted text-muted-foreground text-[10px]">
+                  <AvatarFallback className="bg-muted text-muted-foreground text-[9px]">
                     {getInitials(responsavel.nome || '')}
                   </AvatarFallback>
                 </Avatar>
