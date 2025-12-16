@@ -356,38 +356,62 @@ Deno.serve(async (req) => {
     
     console.log(`[dispatcher-multi] Event type: ${eventType}`);
 
-    // ========== GUARD CLAUSE: MENSAGEM PRIVADA SEM CARD = IGNORAR ==========
+    // ========== GHOST-GUARD INTELIGENTE ==========
+    // Agora verificamos LABELS primeiro antes de bloquear mensagens privadas
     const isPrivateMessage = payload?.private === true || payload?.message?.private === true;
     const messageType = payload?.message_type || payload?.message?.message_type;
     
-    // Para message_created privada, verificar ANTES de qualquer processamento
+    // Para message_created/message_updated privada, verificar se tem labels mapeados ANTES de bloquear
     if ((eventType === 'message_created' || eventType === 'message_updated') && isPrivateMessage) {
       const tempConvId = resolveConversationId(payload);
       
       if (tempConvId) {
+        // 1. Verificar se já existe card
         const { data: existingCard } = await supabase
           .from('cards_conversas')
           .select('id')
           .eq('chatwoot_conversa_id', tempConvId)
           .maybeSingle();
         
+        // 2. Se não existe card, verificar se tem labels mapeados que criam card
         if (!existingCard) {
-          console.log(`[GHOST-GUARD] ⛔ Mensagem privada sem card existente - BLOQUEANDO. ConversationId: ${tempConvId}`);
+          // Buscar labels da conversa
+          const convLabels = payload?.conversation?.labels || payload?.labels || [];
           
-          await supabase.from('webhook_sync_logs').insert({
-            sync_type: 'chatwoot_to_lovable',
-            conversation_id: tempConvId,
-            status: 'blocked',
-            event_type: 'ghost_card_prevented',
-            error_message: 'Mensagem privada bloqueada: não existe card para esta conversa',
-            latency_ms: Date.now() - startTime,
-            payload: { isPrivate: true, messageType, reason: 'GHOST_CARD_PREVENTION' }
-          });
+          // Buscar mappings ativos
+          const { data: mappingsCheck } = await supabase
+            .from('mappings_config')
+            .select('chatwoot_key, lovable_funil')
+            .eq('active', true)
+            .eq('chatwoot_type', 'label');
           
-          return new Response(
-            JSON.stringify({ success: true, message: 'Private message ignored - no existing card', blocked: true }),
-            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          // Verificar se algum label da conversa tem mapeamento
+          const hasMatchingLabel = convLabels.some((label: string) => 
+            mappingsCheck?.some(m => m.chatwoot_key === label && m.lovable_funil)
           );
+          
+          // Se não tem label mapeado E não tem card = BLOQUEAR
+          if (!hasMatchingLabel) {
+            console.log(`[GHOST-GUARD] ⛔ Mensagem privada sem card e sem label mapeado - BLOQUEANDO. ConversationId: ${tempConvId}, Labels: ${convLabels.join(', ')}`);
+            
+            await supabase.from('webhook_sync_logs').insert({
+              sync_type: 'chatwoot_to_lovable',
+              conversation_id: tempConvId,
+              status: 'blocked',
+              event_type: 'ghost_card_prevented',
+              error_message: `Mensagem privada bloqueada: sem card e sem label mapeado. Labels: [${convLabels.join(', ')}]`,
+              latency_ms: Date.now() - startTime,
+              payload: { isPrivate: true, messageType, labels: convLabels, reason: 'GHOST_CARD_PREVENTION_NO_LABEL' }
+            });
+            
+            return new Response(
+              JSON.stringify({ success: true, message: 'Private message ignored - no existing card and no mapped label', blocked: true }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          
+          // Se tem label mapeado, deixar passar para criar o card
+          console.log(`[GHOST-GUARD] ✅ Mensagem privada com label mapeado - PERMITINDO criação de card. ConversationId: ${tempConvId}, Labels: ${convLabels.join(', ')}`);
         }
       }
     }
