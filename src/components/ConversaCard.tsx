@@ -196,8 +196,7 @@ export const ConversaCard = ({
     <Card
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      className="p-0 
+      className="p-0
         hover:shadow-xl hover:scale-[1.02] hover:border-primary/30 
         transition-all duration-200 
         bg-card/80 backdrop-blur-sm border-border/50 

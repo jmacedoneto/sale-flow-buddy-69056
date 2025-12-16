@@ -33,7 +33,7 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
         .from('atividades_cards')
         .select(`
           *,
-          cards_conversas!inner(
+          cards_conversas(
             id,
             titulo,
             funil_id,

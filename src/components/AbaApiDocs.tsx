@@ -19,14 +19,14 @@ export const AbaApiDocs = () => {
     
     setIsGenerating(true);
     try {
-      const { data, error } = await supabase.functions.invoke('api-key-auth', {
-        body: { action: 'generate', name: 'API Key - ' + new Date().toLocaleDateString() }
+      const { data, error } = await supabase.functions.invoke('api-key-auth/generate', {
+        body: { name: 'API Key - ' + new Date().toLocaleDateString() }
       });
 
       if (error) throw error;
       
-      if (data?.apiKey) {
-        setApiKey(data.apiKey);
+      if (data?.api_key) {
+        setApiKey(data.api_key);
         toast.success("API Key gerada com sucesso!");
       }
     } catch (error: any) {

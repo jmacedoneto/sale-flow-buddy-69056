@@ -11,10 +11,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
 
 interface BulkActionsBarProps {
   selectedCount: number;
@@ -30,7 +31,26 @@ export const BulkActionsBar = ({
   funilId,
 }: BulkActionsBarProps) => {
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isMaster, setIsMaster] = useState(false);
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  // Verificar se é super admin (master)
+  useEffect(() => {
+    const checkMasterRole = async () => {
+      if (!user?.email) return;
+      
+      const { data } = await supabase
+        .from('users_crm')
+        .select('role')
+        .eq('email', user.email)
+        .single();
+      
+      setIsMaster(data?.role === 'master');
+    };
+    
+    checkMasterRole();
+  }, [user?.email]);
 
   if (selectedCount === 0) return null;
 
@@ -69,37 +89,39 @@ export const BulkActionsBar = ({
           {selectedCount} {selectedCount === 1 ? 'selecionado' : 'selecionados'}
         </span>
 
-        <AlertDialog>
-          <AlertDialogTrigger asChild>
-            <Button
-              variant="destructive"
-              size="sm"
-              className="gap-2"
-              disabled={isDeleting}
-            >
-              <Trash2 className="h-4 w-4" />
-              Excluir ({selectedCount})
-            </Button>
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
-              <AlertDialogDescription>
-                Você está prestes a excluir {selectedCount} card(s). Esta ação não pode ser desfeita.
-                Todos os dados associados (atividades, produtos, histórico) serão perdidos.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={handleBulkDelete}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+        {isMaster && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-2"
+                disabled={isDeleting}
               >
-                {isDeleting ? 'Excluindo...' : 'Sim, excluir'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+                <Trash2 className="h-4 w-4" />
+                Excluir ({selectedCount})
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Confirmar exclusão</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Você está prestes a excluir {selectedCount} card(s). Esta ação não pode ser desfeita.
+                  Todos os dados associados (atividades, produtos, histórico) serão perdidos.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={handleBulkDelete}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {isDeleting ? 'Excluindo...' : 'Sim, excluir'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
 
         <Button
           variant="ghost"
