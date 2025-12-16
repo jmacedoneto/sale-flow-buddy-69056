@@ -11,6 +11,7 @@ import { AbaMotivosPerda } from "@/components/AbaMotivosPerda";
 import { AbaKanbanColors } from "@/components/AbaKanbanColors";
 import { AbaFunis } from "@/components/AbaFunis";
 import { AbaPerfilUsuario } from "@/components/AbaPerfilUsuario";
+import { AbaApiDocs } from "@/components/AbaApiDocs";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,7 +29,8 @@ import {
   XCircle,
   Palette,
   Settings,
-  UserCircle
+  UserCircle,
+  Code
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -81,6 +83,12 @@ const menuCategories: MenuCategory[] = [
     items: [
       { id: "usuarios", label: "Usuários", icon: Users },
     ]
+  },
+  {
+    title: "Desenvolvimento",
+    items: [
+      { id: "api-docs", label: "API Docs", icon: Code },
+    ]
   }
 ];
 const Configuracoes = () => {
@@ -127,6 +135,7 @@ const Configuracoes = () => {
       case "motivos-perda": return <AbaMotivosPerda />;
       case "kanban-colors": return <AbaKanbanColors />;
       case "usuarios": return <AbaUsuarios />;
+      case "api-docs": return <AbaApiDocs />;
       default: return <AbaPerfilUsuario />;
     }
   };

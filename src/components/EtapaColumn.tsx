@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { ConversaCard } from "./ConversaCard";
 import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import type { CardWithStatus } from "@/hooks/useFunis";
 
 interface EtapaColumnProps {
@@ -30,8 +29,6 @@ export const EtapaColumn = ({
   const { setNodeRef, isOver } = useDroppable({
     id: etapaId,
   });
-
-  const cardIds = cards.map((card) => card.id);
   
   // Cores modernas por etapa
   const defaultColors = [
@@ -95,32 +92,30 @@ export const EtapaColumn = ({
       </div>
       
       {/* Cards List */}
-      <SortableContext items={cardIds} strategy={verticalListSortingStrategy}>
-        <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
-          {cards.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground text-sm rounded-xl border border-dashed border-border/50 bg-muted/20">
-              Nenhum card nesta etapa
-            </div>
-          ) : (
-            cards.map((card) => (
-              <ConversaCard
-                key={card.id}
-                id={card.id}
-                titulo={card.titulo || 'Sem título'}
-                resumo={card.resumo}
-                chatwootConversaId={card.chatwoot_conversa_id || undefined}
-                createdAt={card.created_at || new Date().toISOString()}
-                statusInfo={card.statusInfo}
-                funilId={card.funil_id || undefined}
-                assignedTo={(card as any).assigned_to}
-                avatarLeadUrl={(card as any).avatar_lead_url}
-                onClick={() => onCardClick?.(card)}
-                onAgendarClick={() => onAgendarClick?.(card)}
-              />
-            ))
-          )}
-        </div>
-      </SortableContext>
+      <div className="space-y-3 max-h-[calc(100vh-280px)] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
+        {cards.length === 0 ? (
+          <div className="text-center py-10 text-muted-foreground text-sm rounded-xl border border-dashed border-border/50 bg-muted/20">
+            Nenhum card nesta etapa
+          </div>
+        ) : (
+          cards.map((card) => (
+            <ConversaCard
+              key={card.id}
+              id={card.id}
+              titulo={card.titulo || 'Sem título'}
+              resumo={card.resumo}
+              chatwootConversaId={card.chatwoot_conversa_id || undefined}
+              createdAt={card.created_at || new Date().toISOString()}
+              statusInfo={card.statusInfo}
+              funilId={card.funil_id || undefined}
+              assignedTo={(card as any).assigned_to}
+              avatarLeadUrl={(card as any).avatar_lead_url}
+              onClick={() => onCardClick?.(card)}
+              onAgendarClick={() => onAgendarClick?.(card)}
+            />
+          ))
+        )}
+      </div>
     </div>
   );
 };
