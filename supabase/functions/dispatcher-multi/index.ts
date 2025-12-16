@@ -32,31 +32,44 @@ interface MappingConfig {
 type TipoFunil = 'COMERCIAL' | 'ADMIN';
 
 /**
- * Resolve nome do contato com múltiplos fallbacks (DRY)
- * Verifica vários caminhos possíveis no payload do Chatwoot/N8N
+ * Resolve nome do contato/cliente com múltiplos fallbacks (DRY)
+ * IMPORTANTE: Prioriza caminhos que contêm o CLIENTE, não o agente
+ * payload.sender pode ser o AGENTE (type='user'), então só usar se type='contact'
  */
 function resolveContactName(payload: any, conversationId: number): string {
-  // Ordem de prioridade para extração do nome
-  const candidates = [
-    payload?.sender?.name,
-    payload?.contact?.name,
-    payload?.meta?.sender?.name,
-    payload?.conversation?.contact?.name,
-    payload?.conversation?.meta?.sender?.name,
-    payload?.message?.sender?.name,
-    payload?.conversation?.sender?.name,
-    // Fallbacks adicionais para N8N
-    payload?.data?.sender?.name,
+  // PRIORIDADE 1: Caminhos específicos do CLIENTE (nunca é o agente)
+  const clientCandidates = [
+    payload?.conversation?.meta?.sender?.name,  // Meta.sender é sempre o cliente
+    payload?.conversation?.contact?.name,        // Contact é sempre o cliente
+    payload?.contact?.name,                      // Contact root
+    payload?.meta?.sender?.name,                 // Meta root
+    // Fallbacks para N8N
     payload?.data?.contact?.name,
+    payload?.data?.conversation?.contact?.name,
   ];
 
-  for (const candidate of candidates) {
+  for (const candidate of clientCandidates) {
     if (candidate && typeof candidate === 'string' && candidate.trim().length > 0) {
+      console.log(`[resolveContactName] Nome encontrado via cliente: "${candidate.trim()}"`);
       return candidate.trim();
     }
   }
 
+  // PRIORIDADE 2: payload.sender APENAS se for do tipo 'contact' (não 'user'/agente)
+  const senderType = payload?.sender?.type;
+  const senderName = payload?.sender?.name;
+  if (senderType === 'contact' && senderName && typeof senderName === 'string' && senderName.trim().length > 0) {
+    console.log(`[resolveContactName] Nome encontrado via sender (type=contact): "${senderName.trim()}"`);
+    return senderName.trim();
+  }
+
+  // Log de debug se sender for agente (type='user')
+  if (senderType === 'user' && senderName) {
+    console.log(`[resolveContactName] IGNORANDO sender.name="${senderName}" porque sender.type='user' (é agente)`);
+  }
+
   // Fallback final - genérico com ID
+  console.log(`[resolveContactName] Fallback: Conversa Chatwoot #${conversationId}`);
   return `Conversa Chatwoot #${conversationId}`;
 }
 
