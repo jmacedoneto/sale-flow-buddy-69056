@@ -122,6 +122,12 @@ function resolveDataRetorno(attrs: Record<string, any>): string {
 }
 
 Deno.serve(async (req) => {
+  // ========== LOG DE VIDA - PRIMEIRA LINHA EXECUTÁVEL ==========
+  const rawBodyForDebug = await req.clone().text();
+  console.log('>>> [DISPATCHER-MULTI] RECEBENDO REQUEST RAW:', rawBodyForDebug.substring(0, 500));
+  console.log('>>> [DISPATCHER-MULTI] METHOD:', req.method, 'URL:', req.url);
+  // ==============================================================
+
   if (req.method === 'OPTIONS') {
     return new Response('OK', { headers: corsHeaders });
   }
@@ -888,11 +894,11 @@ Deno.serve(async (req) => {
 
       // ====== AUTO-HEAL COM CRITÉRIO ESTRITO ======
       // GUARD CLAUSE 3: Só criar card se houver CRITÉRIO VÁLIDO (labels OU webhook_path mapeado)
-      const hasValidLabels = labels && labels.length > 0 && labelFunil;
-      const hasValidWebhookPath = webhookConfig?.name && final_funil_nome !== 'Comercial'; // Comercial é fallback universal
-      const hasValidCriteria = hasValidLabels || hasValidWebhookPath;
+      const autoHealHasValidLabels = labels && labels.length > 0 && labelFunil;
+      const autoHealHasValidPath = webhookConfig?.name && final_funil_nome !== 'Comercial'; // Comercial é fallback universal
+      const autoHealHasValidCriteria = autoHealHasValidLabels || autoHealHasValidPath;
 
-      if (!hasValidCriteria) {
+      if (!autoHealHasValidCriteria) {
         console.log(`[AUTO-HEAL NEGADO] Sem critério de classificação válido. ConversationId: ${conversationId}, Labels: ${labels?.join(',') || 'nenhuma'}, WebhookPath: ${webhookPath}`);
         await supabase.from('webhook_sync_logs').insert({
           sync_type: 'chatwoot_to_lovable',
@@ -1036,8 +1042,14 @@ Deno.serve(async (req) => {
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
-  } catch (error) {
-    console.error('[dispatcher-multi] Fatal error:', error);
+  } catch (error: unknown) {
+    // ========== REDE DE SEGURANÇA - LOG FORÇADO DE ERRO ==========
+    const err = error as Error;
+    console.error('>>> [DISPATCHER-MULTI] FATAL ERROR CAUGHT:', err);
+    console.error('>>> [DISPATCHER-MULTI] Error name:', err?.name);
+    console.error('>>> [DISPATCHER-MULTI] Error message:', err?.message);
+    console.error('>>> [DISPATCHER-MULTI] Error stack:', err?.stack);
+    // ==============================================================
     
     try {
       const supabase = createClient(
@@ -1050,15 +1062,26 @@ Deno.serve(async (req) => {
         conversation_id: conversationId,
         card_id: cardId,
         status: 'error',
-        event_type: eventType || 'unknown',
-        error_message: String(error).substring(0, 500),
+        event_type: eventType || 'crash_handler',
+        error_message: `CRASH: ${String(err?.message || err).substring(0, 400)}`,
         latency_ms: Date.now() - startTime,
+        payload: {
+          errorName: err?.name,
+          errorStack: err?.stack?.substring(0, 500),
+        }
       });
-    } catch {}
+    } catch (logError) {
+      console.error('>>> [DISPATCHER-MULTI] Failed to log error to DB:', logError);
+    }
 
+    // Retornar 200 para evitar retries do N8N/Chatwoot
     return new Response(
-      JSON.stringify({ error: String(error) }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: String(err?.message || err),
+        recovered: true,
+        hint: 'Check Supabase Edge Function logs for details'
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
