@@ -24,6 +24,8 @@ interface ConversaCardProps {
   statusInfo: StatusInfo;
   funilId?: string;
   assignedTo?: string | null;
+  avatarLeadUrl?: string | null;
+  avatarAgenteUrl?: string | null;
   onClick?: () => void;
   onAgendarClick?: () => void;
   onFollowUpCreated?: () => void;
@@ -48,6 +50,8 @@ export const ConversaCard = ({
   statusInfo,
   funilId,
   assignedTo,
+  avatarLeadUrl,
+  avatarAgenteUrl,
   onClick,
   onAgendarClick,
   onFollowUpCreated,
@@ -220,6 +224,9 @@ export const ConversaCard = ({
         {/* Header com Avatar do Lead */}
         <div className="flex items-start gap-3">
           <Avatar className="h-9 w-9 shrink-0 border-2 border-primary/20">
+            {avatarLeadUrl ? (
+              <AvatarImage src={avatarLeadUrl} alt={titulo} />
+            ) : null}
             <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
               {leadInitials}
             </AvatarFallback>

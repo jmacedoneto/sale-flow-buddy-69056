@@ -69,10 +69,19 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
       setResumoComercial(card.resumo_comercial || "");
       setFunilId(card.funil_id || "");
       setEtapaId(card.etapa_id || "");
-      
-      // Não gera mais automaticamente - só quando o usuário clicar no botão
     }
   }, [card]);
+
+  // ZERO-CLICK: Gerar resumo automaticamente se não existir
+  useEffect(() => {
+    if (!card) return;
+    if (!card.chatwoot_conversa_id) return;
+    if (card.resumo_comercial) return; // Já tem resumo
+    if (isGeneratingResumo) return; // Já está gerando
+    
+    console.log('[CardDetails] Gerando resumo automaticamente...');
+    handleGerarResumo();
+  }, [card?.id, card?.chatwoot_conversa_id, card?.resumo_comercial]);
 
   // GRUPO B.2: Autosave expandido para TODOS os campos relevantes
   const { save: autosave, isSaving } = useAutosave({ 

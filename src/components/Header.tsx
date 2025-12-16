@@ -1,14 +1,46 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, Circle } from "lucide-react";
+import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, Circle, User } from "lucide-react";
 import { useSystemHealth } from "@/hooks/useSystemHealth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+
+const getInitials = (name: string): string => {
+  if (!name) return "?";
+  const parts = name.trim().split(" ");
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
 
 export const Header = () => {
   const location = useLocation();
   const { data: healthStatus } = useSystemHealth();
   const { isAdmin } = usePermissions();
+  const { user } = useAuth();
+  const [userData, setUserData] = useState<{ nome: string | null; avatar_url: string | null } | null>(null);
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      if (!user?.id) return;
+      
+      const { data } = await supabase
+        .from('users_crm')
+        .select('nome, avatar_url')
+        .eq('id', user.id)
+        .single();
+      
+      if (data) setUserData(data);
+    };
+
+    fetchUserData();
+  }, [user?.id]);
 
   const chatwootHealth = healthStatus?.find(h => h.service === 'chatwoot');
   const isHealthy = chatwootHealth?.status === 'operational';
@@ -20,7 +52,6 @@ export const Header = () => {
     { path: "/configuracoes", label: "Configurações", icon: Settings, requireAdmin: true },
   ];
 
-  // Filtra itens de navegação baseado em permissões
   const navItems = allNavItems.filter(item => !item.requireAdmin || isAdmin);
 
   return (
@@ -74,15 +105,39 @@ export const Header = () => {
             })}
           </nav>
 
-          {/* Mobile Menu */}
-          <div className="flex md:hidden">
-            {isAdmin && (
-              <Link to="/configuracoes">
-                <Button variant="ghost" size="sm">
-                  <Settings className="h-4 w-4" />
-                </Button>
-              </Link>
-            )}
+          {/* User Avatar e Mobile Menu */}
+          <div className="flex items-center gap-3">
+            {/* Avatar do usuário logado */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Link to="/configuracoes">
+                    <Avatar className="h-8 w-8 border-2 border-primary/20 cursor-pointer hover:border-primary/50 transition-colors">
+                      {userData?.avatar_url ? (
+                        <AvatarImage src={userData.avatar_url} alt={userData.nome || 'Usuário'} />
+                      ) : null}
+                      <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                        {getInitials(userData?.nome || user?.email || '')}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">{userData?.nome || user?.email}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            {/* Mobile Menu */}
+            <div className="flex md:hidden">
+              {isAdmin && (
+                <Link to="/configuracoes">
+                  <Button variant="ghost" size="sm">
+                    <Settings className="h-4 w-4" />
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
         </div>
       </div>

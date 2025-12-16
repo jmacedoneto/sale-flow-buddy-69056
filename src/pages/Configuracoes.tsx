@@ -10,6 +10,7 @@ import { AbaProdutos } from "@/components/AbaProdutos";
 import { AbaMotivosPerda } from "@/components/AbaMotivosPerda";
 import { AbaKanbanColors } from "@/components/AbaKanbanColors";
 import { AbaFunis } from "@/components/AbaFunis";
+import { AbaPerfilUsuario } from "@/components/AbaPerfilUsuario";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -26,7 +27,8 @@ import {
   Package,
   XCircle,
   Palette,
-  Settings
+  Settings,
+  UserCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +36,7 @@ interface MenuItem {
   id: string;
   label: string;
   icon: React.ComponentType<{ className?: string }>;
+  adminOnly?: boolean;
 }
 
 interface MenuCategory {
@@ -42,6 +45,12 @@ interface MenuCategory {
 }
 
 const menuCategories: MenuCategory[] = [
+  {
+    title: "Pessoal",
+    items: [
+      { id: "perfil", label: "Meu Perfil", icon: UserCircle, adminOnly: false },
+    ]
+  },
   {
     title: "Integrações",
     items: [
@@ -74,10 +83,9 @@ const menuCategories: MenuCategory[] = [
     ]
   }
 ];
-
 const Configuracoes = () => {
   const { isAdmin, loading } = usePermissions();
-  const [activeTab, setActiveTab] = useState("chatwoot");
+  const [activeTab, setActiveTab] = useState("perfil");
 
   if (loading) {
     return (
@@ -107,6 +115,7 @@ const Configuracoes = () => {
 
   const renderContent = () => {
     switch (activeTab) {
+      case "perfil": return <AbaPerfilUsuario />;
       case "chatwoot": return <AbaConfigChatwoot />;
       case "webhooks": return <AbaWebhooks />;
       case "externos": return <AbaWebhooksExternos />;
@@ -118,7 +127,7 @@ const Configuracoes = () => {
       case "motivos-perda": return <AbaMotivosPerda />;
       case "kanban-colors": return <AbaKanbanColors />;
       case "usuarios": return <AbaUsuarios />;
-      default: return <AbaConfigChatwoot />;
+      default: return <AbaPerfilUsuario />;
     }
   };
 
