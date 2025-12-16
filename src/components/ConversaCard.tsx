@@ -227,10 +227,25 @@ export const ConversaCard = ({
               <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer">
                 {titulo}
               </h4>
-              {chatwootConversaId && (
-                <Badge variant="outline" className="text-[10px] shrink-0 font-normal">
-                  #{chatwootConversaId}
-                </Badge>
+              {/* Avatar do Responsável no header - substitui #ID */}
+              {responsavel && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Avatar className="h-6 w-6 shrink-0 border border-border shadow-sm">
+                        {responsavel.avatar_url ? (
+                          <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
+                        ) : null}
+                        <AvatarFallback className="bg-primary/10 text-primary text-[9px]">
+                          {getInitials(responsavel.nome || '')}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p className="text-xs">{responsavel.nome || 'Responsável'}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
             </div>
           </div>
@@ -265,27 +280,6 @@ export const ConversaCard = ({
             {renderAtividadeBadge()}
             {renderStatusBadge()}
           </div>
-          
-          {/* Avatar do Responsável - ao lado dos badges */}
-          {responsavel && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Avatar className="h-5 w-5 border border-border shadow-sm">
-                    {responsavel.avatar_url ? (
-                      <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
-                    ) : null}
-                    <AvatarFallback className="bg-muted text-muted-foreground text-[8px]">
-                      {getInitials(responsavel.nome || '')}
-                    </AvatarFallback>
-                  </Avatar>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  <p className="text-xs">{responsavel.nome || 'Responsável'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
         </div>
 
         {/* Action Buttons - Separados do drag */}

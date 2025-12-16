@@ -57,9 +57,28 @@ export const ListaCards = ({
     onToggleSelect?.(id);
   };
 
+  // Formata telefone: +5511... -> 011...
+  const formatPhoneNumber = (phone: string): string => {
+    if (!phone) return '';
+    
+    // Remove +55 do início
+    let formatted = phone.replace(/^\+55/, '');
+    
+    // Remove caracteres não numéricos
+    formatted = formatted.replace(/\D/g, '');
+    
+    // Adiciona 0 na frente do DDD se não tiver
+    if (formatted.length >= 10 && !formatted.startsWith('0')) {
+      formatted = '0' + formatted;
+    }
+    
+    return formatted;
+  };
+
   const handleCopyPhone = (e: React.MouseEvent, phone: string) => {
     e.stopPropagation();
-    navigator.clipboard.writeText(phone);
+    const formattedPhone = formatPhoneNumber(phone);
+    navigator.clipboard.writeText(formattedPhone);
     toast.success("Telefone copiado!");
   };
 
@@ -144,7 +163,7 @@ export const ListaCards = ({
                             onClick={(e) => handleCopyPhone(e, card.telefone_lead!)}
                           >
                             <Copy className="h-3 w-3 mr-1 text-muted-foreground" />
-                            {card.telefone_lead}
+                            {formatPhoneNumber(card.telefone_lead)}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent>Clique para copiar</TooltipContent>

@@ -19,7 +19,7 @@ export const useWebhookLogs = (
   return useQuery<{ logs: WebhookLog[]; totalCount: number }>({
     queryKey: ['webhook-logs', page, filters],
     queryFn: () => getWebhookLogs(page, 50, filters),
-    refetchInterval: 10000, // Auto-refresh a cada 10s
+    refetchInterval: 10000,
   });
 };
 
@@ -27,21 +27,21 @@ export const useWebhookStats = () => {
   return useQuery<WebhookStats>({
     queryKey: ['webhook-stats'],
     queryFn: getWebhookStats,
-    refetchInterval: 15000, // Auto-refresh a cada 15s
+    refetchInterval: 15000,
   });
 };
 
 export const useCleanOldLogs = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
-    mutationFn: cleanOldLogs,
-    onSuccess: (deletedCount) => {
+  return useMutation<number, Error, number>({
+    mutationFn: (days: number) => cleanOldLogs(days),
+    onSuccess: (deletedCount, days) => {
       queryClient.invalidateQueries({ queryKey: ['webhook-logs'] });
       queryClient.invalidateQueries({ queryKey: ['webhook-stats'] });
       toast({
         title: "✓ Logs limpos",
-        description: `${deletedCount} logs antigos removidos com sucesso.`,
+        description: `${deletedCount} logs com mais de ${days} dia(s) removidos.`,
       });
     },
     onError: (error: Error) => {

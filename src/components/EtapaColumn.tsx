@@ -75,20 +75,19 @@ export const EtapaColumn = ({
               borderWidth: '1px'
             }}
           >
-            {cards.length}
-            {totalCards && totalCards > cards.length && (
-              <span className="ml-1 opacity-60">/ {totalCards}</span>
-            )}
-          </Badge>
-        </div>
-        {totalValor > 0 && (
-          <div className="text-sm font-medium text-foreground/80">
             {new Intl.NumberFormat('pt-BR', {
               style: 'currency',
-              currency: 'BRL'
-            }).format(totalValor)}
-          </div>
-        )}
+              currency: 'BRL',
+              maximumFractionDigits: 0,
+            }).format(totalValor || 0)}
+          </Badge>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <span>{cards.length} card{cards.length !== 1 ? 's' : ''}</span>
+          {totalCards && totalCards > cards.length && (
+            <span className="opacity-60">/ {totalCards} total</span>
+          )}
+        </div>
       </div>
       
       {/* Cards List */}

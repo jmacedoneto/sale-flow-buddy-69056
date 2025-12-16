@@ -20,11 +20,12 @@ import {
   Clock,
   ArrowRight,
   ArrowLeft,
+  Copy,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useNavigate } from "react-router-dom";
-
+import { toast } from "sonner";
 interface LogDetalheDrawerProps {
   logId: string | null;
   open: boolean;
@@ -204,10 +205,23 @@ export const LogDetalheDrawer = ({ logId, open, onClose }: LogDetalheDrawerProps
               {/* Payload JSON */}
               <Separator />
               <div>
-                <h3 className="font-semibold mb-3">Payload Completo (JSON)</h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="font-semibold">Payload Completo (JSON)</h3>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(JSON.stringify(log.payload, null, 2) || 'null');
+                      toast.success("JSON copiado!");
+                    }}
+                  >
+                    <Copy className="h-4 w-4 mr-1" />
+                    Copiar
+                  </Button>
+                </div>
                 <div className="relative">
-                  <pre className="p-4 bg-muted rounded-md text-xs overflow-x-auto">
-                    <code>{JSON.stringify(log.payload, null, 2)}</code>
+                  <pre className="p-4 bg-muted rounded-md text-xs overflow-x-auto max-h-[300px]">
+                    <code>{JSON.stringify(log.payload, null, 2) || 'null'}</code>
                   </pre>
                 </div>
               </div>

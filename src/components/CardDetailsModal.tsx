@@ -127,6 +127,25 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     }
   }, [prioridade]);
 
+  // Autosave para funil
+  useEffect(() => {
+    if (!card) return;
+    if (funilId && funilId !== (card.funil_id || '')) {
+      const funilNome = funis?.find(f => f.id === funilId)?.nome || null;
+      autosave({ funil_id: funilId, funil_nome: funilNome });
+      setEtapaId(''); // Reset etapa when funil changes
+    }
+  }, [funilId, funis]);
+
+  // Autosave para etapa
+  useEffect(() => {
+    if (!card) return;
+    if (etapaId && etapaId !== (card.etapa_id || '')) {
+      const etapaNome = etapas?.find(e => e.id === etapaId)?.nome || null;
+      autosave({ etapa_id: etapaId, funil_etapa: etapaNome });
+    }
+  }, [etapaId, etapas]);
+
   const handleSave = async () => {
     if (!card) return;
 
@@ -316,26 +335,62 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
     onOpenChange(false);
   };
 
+  // IDs fixos para Clientes Frios
+  const FUNIL_CLIENTES_FRIOS_ID = '8ccd3f79-38a7-430d-aab5-01e1972458c7';
+  const ETAPA_LEAD_FRIO_ID = '04708ec2-0809-4b74-be26-0348a9f61d12';
 
-  const handlePausar = () => {
+  const handlePausar = async () => {
     if (!card) return;
     
     const novoPausado = !card.pausado;
     
-    updateCard.mutate(
-      {
+    if (novoPausado) {
+      // PAUSAR: Salvar etapa original e mover para Clientes Frios
+      await updateCard.mutateAsync({
         id: card.id,
         updates: {
-          pausado: novoPausado,
-          status: novoPausado ? 'pausado' : 'em_andamento',
+          pausado: true,
+          status: 'pausado',
+          etapa_origem_id: card.etapa_id, // Salvar etapa original
+          funil_id: FUNIL_CLIENTES_FRIOS_ID,
+          etapa_id: ETAPA_LEAD_FRIO_ID,
+          funil_nome: 'Clientes Frios',
+          funil_etapa: 'Lead Frio / Inativo',
         },
-      },
-      {
-        onSuccess: () => {
-          toast.success(novoPausado ? "Negociação pausada" : "Negociação retomada");
-        },
+      });
+      toast.success("Negociação pausada e movida para Clientes Frios");
+      setFunilId(FUNIL_CLIENTES_FRIOS_ID);
+      setEtapaId(ETAPA_LEAD_FRIO_ID);
+    } else {
+      // RETOMAR: Voltar para etapa original (se existir)
+      const updates: any = {
+        pausado: false,
+        status: 'em_andamento',
+      };
+      
+      if (card.etapa_origem_id) {
+        // Buscar informações da etapa original
+        const { data: etapaOrigem } = await supabase
+          .from('etapas')
+          .select('id, nome, funil_id, funis(nome)')
+          .eq('id', card.etapa_origem_id)
+          .single();
+        
+        if (etapaOrigem) {
+          updates.funil_id = etapaOrigem.funil_id;
+          updates.etapa_id = etapaOrigem.id;
+          updates.funil_nome = (etapaOrigem.funis as any)?.nome || null;
+          updates.funil_etapa = etapaOrigem.nome;
+          updates.etapa_origem_id = null; // Limpar referência
+          
+          setFunilId(etapaOrigem.funil_id);
+          setEtapaId(etapaOrigem.id);
+        }
       }
-    );
+      
+      await updateCard.mutateAsync({ id: card.id, updates });
+      toast.success("Negociação retomada!");
+    }
   };
 
   const handleSyncFromChatwoot = async () => {
@@ -413,10 +468,11 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                 <Pause className="h-4 w-4 mr-1" />
                 {card.pausado ? "Retomar" : "Pausar"}
               </Button>
-              <Button onClick={handleSave} disabled={updateCard.isPending}>
-                <Save className="h-4 w-4 mr-2" />
-                Salvar
-              </Button>
+              {isSaving && (
+                <Badge variant="secondary" className="text-xs animate-pulse">
+                  Salvando...
+                </Badge>
+              )}
             </div>
           </div>
         </SheetHeader>
