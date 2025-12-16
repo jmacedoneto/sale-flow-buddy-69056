@@ -12,6 +12,19 @@ interface WebhookPayload {
     custom_attributes?: Record<string, any>;
     changed_attributes?: Record<string, any>;
     labels?: string[];
+    meta?: {
+      sender?: {
+        name?: string;
+        phone_number?: string;
+        thumbnail?: string;
+        id?: number;
+      };
+      assignee?: {
+        name?: string;
+        avatar_url?: string;
+        id?: number;
+      };
+    };
   };
   id?: number;
   private?: boolean;
@@ -33,44 +46,94 @@ type TipoFunil = 'COMERCIAL' | 'ADMIN';
 
 /**
  * Resolve nome do contato/cliente com múltiplos fallbacks (DRY)
- * IMPORTANTE: Prioriza caminhos que contêm o CLIENTE, não o agente
- * payload.sender pode ser o AGENTE (type='user'), então só usar se type='contact'
  */
 function resolveContactName(payload: any, conversationId: number): string {
-  // PRIORIDADE 1: Caminhos específicos do CLIENTE (nunca é o agente)
   const clientCandidates = [
-    payload?.conversation?.meta?.sender?.name,  // Meta.sender é sempre o cliente
-    payload?.conversation?.contact?.name,        // Contact é sempre o cliente
-    payload?.contact?.name,                      // Contact root
-    payload?.meta?.sender?.name,                 // Meta root
-    // Fallbacks para N8N
+    payload?.conversation?.meta?.sender?.name,
+    payload?.conversation?.contact?.name,
+    payload?.contact?.name,
+    payload?.meta?.sender?.name,
     payload?.data?.contact?.name,
     payload?.data?.conversation?.contact?.name,
   ];
 
   for (const candidate of clientCandidates) {
     if (candidate && typeof candidate === 'string' && candidate.trim().length > 0) {
-      console.log(`[resolveContactName] Nome encontrado via cliente: "${candidate.trim()}"`);
+      console.log(`[resolveContactName] Nome encontrado: "${candidate.trim()}"`);
       return candidate.trim();
     }
   }
 
-  // PRIORIDADE 2: payload.sender APENAS se for do tipo 'contact' (não 'user'/agente)
   const senderType = payload?.sender?.type;
   const senderName = payload?.sender?.name;
   if (senderType === 'contact' && senderName && typeof senderName === 'string' && senderName.trim().length > 0) {
-    console.log(`[resolveContactName] Nome encontrado via sender (type=contact): "${senderName.trim()}"`);
     return senderName.trim();
   }
 
-  // Log de debug se sender for agente (type='user')
-  if (senderType === 'user' && senderName) {
-    console.log(`[resolveContactName] IGNORANDO sender.name="${senderName}" porque sender.type='user' (é agente)`);
-  }
-
-  // Fallback final - genérico com ID
-  console.log(`[resolveContactName] Fallback: Conversa Chatwoot #${conversationId}`);
   return `Conversa Chatwoot #${conversationId}`;
+}
+
+/**
+ * NOVO: Extrai avatar do lead (thumbnail do sender)
+ */
+function resolveAvatarLead(payload: any): string | null {
+  const candidates = [
+    payload?.conversation?.meta?.sender?.thumbnail,
+    payload?.conversation?.contact?.thumbnail,
+    payload?.contact?.thumbnail,
+    payload?.meta?.sender?.thumbnail,
+    payload?.sender?.thumbnail,
+    payload?.data?.contact?.thumbnail,
+  ];
+  
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'string' && candidate.startsWith('http')) {
+      console.log(`[resolveAvatarLead] Avatar encontrado: ${candidate.substring(0, 50)}...`);
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/**
+ * NOVO: Extrai avatar do agente (assignee)
+ */
+function resolveAvatarAgente(payload: any): string | null {
+  const candidates = [
+    payload?.conversation?.meta?.assignee?.avatar_url,
+    payload?.conversation?.assignee?.avatar_url,
+    payload?.assignee?.avatar_url,
+    payload?.meta?.assignee?.avatar_url,
+  ];
+  
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'string' && candidate.startsWith('http')) {
+      console.log(`[resolveAvatarAgente] Avatar agente encontrado: ${candidate.substring(0, 50)}...`);
+      return candidate;
+    }
+  }
+  return null;
+}
+
+/**
+ * NOVO: Extrai telefone do lead
+ */
+function resolveTelefoneLead(payload: any): string | null {
+  const candidates = [
+    payload?.conversation?.meta?.sender?.phone_number,
+    payload?.conversation?.contact?.phone_number,
+    payload?.contact?.phone_number,
+    payload?.meta?.sender?.phone_number,
+    payload?.sender?.phone_number,
+  ];
+  
+  for (const candidate of candidates) {
+    if (candidate && typeof candidate === 'string' && candidate.trim().length > 0) {
+      console.log(`[resolveTelefoneLead] Telefone encontrado: ${candidate}`);
+      return candidate.trim();
+    }
+  }
+  return null;
 }
 
 // Resolve funil baseado em labels (PRIORIDADE 1 - SSOT)
@@ -92,12 +155,10 @@ function resolveFunilByLabel(
   return { funilNome: null, etapaDefault: null };
 }
 
-// Identifica tipo de funil (Comercial vs Administrativo)
 function resolveTipoFunil(funilNome: string): TipoFunil {
   return funilNome === 'Comercial' ? 'COMERCIAL' : 'ADMIN';
 }
 
-// Resolve etapa baseado em atributos (PRIORIDADE 2 - complementar)
 function resolveEtapaPorAtributos(
   tipoFunil: TipoFunil,
   attrs: Record<string, any>,
@@ -106,14 +167,12 @@ function resolveEtapaPorAtributos(
   const attrKey = tipoFunil === 'COMERCIAL' ? 'etapa_comercial' : 'funil_etapa';
   let attrValue = attrs[attrKey];
   
-  // Se for array, pegar primeiro item
   if (Array.isArray(attrValue)) {
     attrValue = attrValue.length > 0 ? attrValue[0] : null;
   }
   
   if (!attrValue) return null;
   
-  // Tentar aplicar mapping se existir
   const mapping = mappings.find(
     m => m.chatwoot_type === 'attr' && 
          m.chatwoot_key === attrKey &&
@@ -123,7 +182,6 @@ function resolveEtapaPorAtributos(
   return mapping?.lovable_etapa || attrValue;
 }
 
-// Resolve data de retorno
 function resolveDataRetorno(attrs: Record<string, any>): string {
   let dataRetorno = attrs['data_retorno'];
   
@@ -135,11 +193,9 @@ function resolveDataRetorno(attrs: Record<string, any>): string {
 }
 
 Deno.serve(async (req) => {
-  // ========== LOG DE VIDA - PRIMEIRA LINHA EXECUTÁVEL ==========
   const rawBodyForDebug = await req.clone().text();
   console.log('>>> [DISPATCHER-MULTI] RECEBENDO REQUEST RAW:', rawBodyForDebug.substring(0, 500));
   console.log('>>> [DISPATCHER-MULTI] METHOD:', req.method, 'URL:', req.url);
-  // ==============================================================
 
   if (req.method === 'OPTIONS') {
     return new Response('OK', { headers: corsHeaders });
@@ -157,18 +213,10 @@ Deno.serve(async (req) => {
     const webhookPath = decodeURIComponent(pathSegments[pathSegments.length - 1]);
     
     console.log(`[dispatcher-multi] Webhook path: ${webhookPath}`);
-    console.log(`[dispatcher-multi] Request method: ${req.method}`);
-    console.log(`[dispatcher-multi] Full URL: ${req.url}`);
     
     const headersObj = Object.fromEntries(req.headers.entries());
-    console.log(`[dispatcher-multi] Headers:`, headersObj);
-    
     const contentType = req.headers.get('content-type');
-    console.log(`[dispatcher-multi] Content-Type: ${contentType}`);
-
-    // Detectar event type do header (Chatwoot envia isso)
     const headerEventType = req.headers.get('X-Chatwoot-Event') || req.headers.get('x-chatwoot-event');
-    console.log(`[dispatcher-multi] Header Event Type: ${headerEventType}`);
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -178,7 +226,6 @@ Deno.serve(async (req) => {
     let webhookConfig = null;
     let matchStrategy = 'exact';
     
-    // Estratégia 1: Match exato
     const { data: exactMatch } = await supabase
       .from('webhooks_config')
       .select('*')
@@ -191,7 +238,6 @@ Deno.serve(async (req) => {
       matchStrategy = 'exact';
     }
     
-    // Estratégia 2: Match parcial (último segmento)
     if (!webhookConfig) {
       const lastSegment = webhookPath.split('/').pop() || webhookPath;
       const { data: partialMatch } = await supabase
@@ -209,7 +255,6 @@ Deno.serve(async (req) => {
       }
     }
     
-    // Estratégia 3: Match case-insensitive
     if (!webhookConfig) {
       const { data: allConfigs } = await supabase
         .from('webhooks_config')
@@ -227,7 +272,6 @@ Deno.serve(async (req) => {
     if (!webhookConfig) {
       console.error(`[dispatcher-multi] Webhook não encontrado para path: ${webhookPath}`);
       
-      // Listar webhooks disponíveis para debug
       const { data: availableWebhooks } = await supabase
         .from('webhooks_config')
         .select('inbox_path, name')
@@ -237,88 +281,58 @@ Deno.serve(async (req) => {
         sync_type: 'chatwoot_to_lovable',
         status: 'error',
         event_type: 'webhook_not_found',
-        error_message: `Webhook não mapeado para path '${webhookPath}'. Verifique webhooks_config.inbox_path.`,
+        error_message: `Webhook não mapeado para path '${webhookPath}'`,
         latency_ms: Date.now() - startTime,
-        payload: { 
-          rawInput: rawPayload,
-          decisionContext: {
-            reason: 'Path do webhook não encontrado na configuração',
-            webhookPath, 
-            url: req.url,
-            availableWebhooks: availableWebhooks?.map(w => w.inbox_path) || []
-          }
-        },
+        payload: { webhookPath, availableWebhooks: availableWebhooks?.map(w => w.inbox_path) || [] },
       });
 
       return new Response(
-        JSON.stringify({ 
-          error: 'Webhook não mapeado', 
-          details: `Path '${webhookPath}' não encontrado em webhooks_config`,
-          hint: `Webhooks disponíveis: ${availableWebhooks?.map(w => w.inbox_path).join(', ') || 'nenhum'}`
-        }),
+        JSON.stringify({ error: 'Webhook não mapeado', details: `Path '${webhookPath}' não encontrado` }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
     
-    console.log(`[dispatcher-multi] Webhook encontrado: ${webhookConfig.name} (strategy: ${matchStrategy})`)
+    console.log(`[dispatcher-multi] Webhook encontrado: ${webhookConfig.name} (strategy: ${matchStrategy})`);
 
-    // Função para extrair conversation_id de múltiplos formatos (inclui suporte N8N)
     function resolveConversationId(payload: any): number | null {
-      // Log para debug
-      console.log('[dispatcher-multi] Resolving ID from payload keys:', Object.keys(payload || {}));
-
       return (
         payload.conversation_id ??
         payload.conversation?.id ??
-        payload.data?.conversation?.id ?? // Suporte a N8N
+        payload.data?.conversation?.id ??
         payload.id ??
-        payload.data?.id ?? // Suporte a N8N genérico
+        payload.data?.id ??
         payload.receivedPayload?.conversation?.id ??
         null
       );
     }
 
-    // Extrair e desembrulhar payload
     let body: any = null;
     let payload: any = null;
     let payloadFormat = 'unknown';
     const method = req.method;
 
-    // Formato 1: POST com JSON body
     if (method === 'POST' && contentType?.includes('application/json')) {
       try {
         const rawBody = await req.text();
-        console.log(`[dispatcher-multi] Raw body length: ${rawBody.length}`);
-        console.log(`[dispatcher-multi] Raw body preview: ${rawBody.substring(0, 500)}`);
         
         if (rawBody && rawBody.trim().length > 0) {
           body = JSON.parse(rawBody);
-          rawPayload = body; // Guardar payload original para debug
+          rawPayload = body;
           
-          console.log(`📥 [Dispatcher] Payload Bruto recebido:`, JSON.stringify(body).substring(0, 200));
-          
-          // Validar payload não vazio
           if (!body || Object.keys(body).length === 0) {
             throw new Error('Payload vazio recebido do Chatwoot');
           }
           
-          // Unwrap inteligente: prioriza receivedPayload, depois tenta data (N8N), depois usa body cru
           payload = body.receivedPayload ?? body.data ?? body;
           payloadFormat = body.receivedPayload ? 'wrapped' : (body.data ? 'n8n_wrapped' : 'raw');
-          
-          console.log(`[dispatcher-multi] Payload parseado (format: ${payloadFormat}, keys: ${Object.keys(payload).join(',')})`);
-        } else {
-          console.error(`[dispatcher-multi] Body vazio recebido`);
         }
       } catch (e) {
         console.error(`[dispatcher-multi] Erro ao parsear JSON:`, e);
       }
     }
 
-    // Formato 2: Query parameters (GET ou POST sem body válido)
     if (!payload) {
       const params = url.searchParams;
-      console.log(`[dispatcher-multi] Query params:`, Object.fromEntries(params.entries()));
       
       if (params.has('event') || params.has('conversation_id')) {
         const customAttrs = params.get('custom_attributes');
@@ -331,41 +345,65 @@ Deno.serve(async (req) => {
           }
         };
         payloadFormat = 'query_params';
-        console.log(`[dispatcher-multi] Payload reconstruído dos query params`);
       }
     }
 
-    // Normalização de Event Type - Chatwoot pode enviar em locais diferentes
     eventType = headerEventType 
       || payload?.event 
       || payload?.event_type 
       || payload?.message_type 
       || 'unknown';
     
-    console.log(`[dispatcher-multi] Event type normalizado: ${eventType}`);
+    console.log(`[dispatcher-multi] Event type: ${eventType}`);
 
-    // Extrair conversation_id usando função robusta
-    // Para message_created, a estrutura pode ser diferente
+    // ========== GUARD CLAUSE: MENSAGEM PRIVADA SEM CARD = IGNORAR ==========
+    const isPrivateMessage = payload?.private === true || payload?.message?.private === true;
+    const messageType = payload?.message_type || payload?.message?.message_type;
+    
+    // Para message_created privada, verificar ANTES de qualquer processamento
+    if ((eventType === 'message_created' || eventType === 'message_updated') && isPrivateMessage) {
+      const tempConvId = resolveConversationId(payload);
+      
+      if (tempConvId) {
+        const { data: existingCard } = await supabase
+          .from('cards_conversas')
+          .select('id')
+          .eq('chatwoot_conversa_id', tempConvId)
+          .maybeSingle();
+        
+        if (!existingCard) {
+          console.log(`[GHOST-GUARD] ⛔ Mensagem privada sem card existente - BLOQUEANDO. ConversationId: ${tempConvId}`);
+          
+          await supabase.from('webhook_sync_logs').insert({
+            sync_type: 'chatwoot_to_lovable',
+            conversation_id: tempConvId,
+            status: 'blocked',
+            event_type: 'ghost_card_prevented',
+            error_message: 'Mensagem privada bloqueada: não existe card para esta conversa',
+            latency_ms: Date.now() - startTime,
+            payload: { isPrivate: true, messageType, reason: 'GHOST_CARD_PREVENTION' }
+          });
+          
+          return new Response(
+            JSON.stringify({ success: true, message: 'Private message ignored - no existing card', blocked: true }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+    }
+    // ========================================================================
+
     const message = payload?.message || payload;
     const conversation = payload?.conversation || message?.conversation;
     
     conversationId = payload ? resolveConversationId(payload) : null;
     
-    // Se não encontrou, tentar na conversation
     if (!conversationId && conversation?.id) {
       conversationId = conversation.id;
     }
 
-    // Debug para conversação específica
-    if (conversationId === 3278) {
-      console.log(`[DEBUG] Conversação 3278 detectada:`, JSON.stringify(payload).substring(0, 2000));
-    }
-
-    // Validar conversation_id
     if (!conversationId) {
       console.error(`[dispatcher-multi] Payload inválido: conversation_id ausente`);
-      console.log(`[dispatcher-multi] Payload recebido:`, JSON.stringify(payload).substring(0, 1000));
-      console.log(`[dispatcher-multi] Raw payload:`, JSON.stringify(rawPayload).substring(0, 1000));
       
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
@@ -373,40 +411,26 @@ Deno.serve(async (req) => {
         event_type: eventType || 'unknown',
         error_message: 'Payload inválido: conversation_id ausente',
         latency_ms: Date.now() - startTime,
-        payload: {
-          method,
-          url: req.url,
-          payload_format: payloadFormat,
-          headers: headersObj,
-          receivedPayload: payload,
-          rawPayload: rawPayload,
-        },
+        payload: { method, payload_format: payloadFormat, receivedPayload: payload },
       });
 
       return new Response(
-        JSON.stringify({ 
-          error: 'Invalid payload', 
-          details: 'conversation_id ausente',
-          debug: {
-            method,
-            payloadFormat,
-            hasPayload: !!payload,
-            conversationId,
-            eventType,
-          }
-        }),
+        JSON.stringify({ error: 'Invalid payload', details: 'conversation_id ausente' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     const conv = payload.conversation || payload;
 
-    // Extrair dados do contato usando função robusta
-    const contactId = payload.contact?.id || payload.meta?.sender?.id || null;
+    // ========== EXTRAÇÃO ENRIQUECIDA DE DADOS ==========
     const contactName = resolveContactName(payload, conversationId);
-    const contactPhone = payload.contact?.phone_number || payload.meta?.sender?.phone_number || null;
+    const avatarLeadUrl = resolveAvatarLead(payload);
+    const avatarAgenteUrl = resolveAvatarAgente(payload);
+    const telefoneLead = resolveTelefoneLead(payload);
     
-    console.log(`[dispatcher-multi] Contact resolved: name="${contactName}", id=${contactId}, phone=${contactPhone}`);
+    console.log(`[dispatcher-multi] Dados extraídos: nome="${contactName}", tel="${telefoneLead}", avatarLead=${!!avatarLeadUrl}, avatarAgente=${!!avatarAgenteUrl}`);
+    // ===================================================
+
     const { data: mappingsData } = await supabase
       .from('mappings_config')
       .select('*')
@@ -419,7 +443,6 @@ Deno.serve(async (req) => {
     const custom_attrs = conv.custom_attributes || {};
     const labels = conv.labels || [];
 
-    // Mesclar atributos (changed tem prioridade)
     const mergedAttrs: Record<string, any> = { ...custom_attrs };
     Object.keys(changed_attrs).forEach(key => {
       const val = changed_attrs[key]?.current_value;
@@ -428,13 +451,11 @@ Deno.serve(async (req) => {
       }
     });
 
-    // REGRA 1: Labels definem funil (SSOT)
     const { funilNome: labelFunil, etapaDefault: labelEtapa } = resolveFunilByLabel(labels, mappings);
 
     let final_funil_nome = labelFunil;
     let fallbackEtapa = labelEtapa;
 
-    // FALLBACK 1: webhook_path quando sem labels
     if (!final_funil_nome && webhookPath) {
       const pathMap: Record<string, { funil: string; etapa: string }> = {
         'comercial_geral': { funil: 'Comercial', etapa: 'Contato Inicial' },
@@ -448,11 +469,9 @@ Deno.serve(async (req) => {
       if (fb) {
         final_funil_nome = fb.funil;
         fallbackEtapa = fb.etapa;
-        console.log(`[dispatcher] FALLBACK 1: webhook_path "${webhookPath}" → Funil: ${fb.funil}`);
       }
     }
 
-    // FALLBACK 2: inbox_id da conversa
     if (!final_funil_nome && conv.inbox_id) {
       const { data: inboxConfig } = await supabase
         .from('webhooks_config')
@@ -463,40 +482,25 @@ Deno.serve(async (req) => {
       if (inboxConfig?.name) {
         final_funil_nome = inboxConfig.name;
         fallbackEtapa = 'Contato Inicial';
-        console.log(`[dispatcher] FALLBACK 2: inbox_id ${conv.inbox_id} → Funil: ${final_funil_nome}`);
       }
     }
 
-    // FALLBACK 3: default universal
     if (!final_funil_nome) {
       final_funil_nome = 'Comercial';
       fallbackEtapa = 'Contato Inicial';
-      console.warn(`[dispatcher] FALLBACK 3: Usando default universal → Comercial/Contato Inicial`);
-      
-      // Log para rastreamento
-      await supabase.from('webhook_sync_logs').insert({
-        sync_type: 'chatwoot_to_lovable',
-        conversation_id: conversationId,
-        status: 'info',
-        event_type: eventType,
-        error_message: 'Usando fallback universal (sem labels/path mapping)',
-        latency_ms: Date.now() - startTime,
-        payload: { labels, attrs: mergedAttrs, webhookPath, fallback: 'universal' },
-      });
     }
+
     const tipoFunil = resolveTipoFunil(final_funil_nome);
 
-    // REGRA 2: Atributos refinam etapa (complementar)
     let final_etapa_nome = resolveEtapaPorAtributos(tipoFunil, mergedAttrs, mappings);
     
-    // Fallback: etapa do fallback ou labelEtapa
     if (!final_etapa_nome) {
       final_etapa_nome = fallbackEtapa || labelEtapa;
     }
 
     const dataRetornoFinal = resolveDataRetorno(mergedAttrs);
 
-    console.log(`[dispatcher-multi] Label → Funil: ${final_funil_nome} (${tipoFunil}), Attr → Etapa: ${final_etapa_nome || 'auto'}, DataRetorno: ${dataRetornoFinal}`);
+    console.log(`[dispatcher-multi] Funil: ${final_funil_nome}, Etapa: ${final_etapa_nome || 'auto'}`);
 
     // Auto-create funil
     let { data: funilRow } = await supabase
@@ -567,7 +571,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Processar events
+    // ========== HANDLER: conversation_updated ==========
     if (eventType === 'conversation_updated') {
       const updateFields: any = {
         funil_id: funilId,
@@ -579,27 +583,16 @@ Deno.serve(async (req) => {
         last_chatwoot_sync_at: new Date().toISOString(),
       };
       
-      // Adicionar telefone ao resumo se disponível
-      if (contactPhone) {
-        updateFields.resumo = `Tel: ${contactPhone}`;
-      }
-
-      // Gravar etapa em resumo_comercial se for comercial
-      if (tipoFunil === 'COMERCIAL' && final_etapa_nome) {
-        updateFields.resumo_comercial = `Etapa: ${final_etapa_nome}`;
-      }
+      // ENRIQUECIMENTO: Adicionar avatares e telefone se disponíveis
+      if (avatarLeadUrl) updateFields.avatar_lead_url = avatarLeadUrl;
+      if (avatarAgenteUrl) updateFields.avatar_agente_url = avatarAgenteUrl;
+      if (telefoneLead) updateFields.telefone_lead = telefoneLead;
 
       const { data: upsertedCard, error: upsertError } = await supabase
         .from('cards_conversas')
         .upsert(
-          {
-            chatwoot_conversa_id: conversationId,
-            ...updateFields
-          },
-          {
-            onConflict: 'chatwoot_conversa_id',
-            ignoreDuplicates: false
-          }
+          { chatwoot_conversa_id: conversationId, ...updateFields },
+          { onConflict: 'chatwoot_conversa_id', ignoreDuplicates: false }
         )
         .select('id')
         .single();
@@ -618,7 +611,7 @@ Deno.serve(async (req) => {
 
       cardId = upsertedCard.id;
 
-      // Criar atividade se data_retorno foi definida/alterada
+      // Criar atividade se data_retorno foi alterada
       if (changed_attrs['data_retorno']) {
         await supabase.from('atividades_cards').insert({
           card_id: cardId,
@@ -628,25 +621,19 @@ Deno.serve(async (req) => {
         });
       }
 
-      // MÓDULO 2: Criar atividade via custom_attributes (resumo_atividade / data_followup)
+      // Criar atividade via custom_attributes
       const resumoAtividade = mergedAttrs['resumo_atividade'];
       const dataFollowup = mergedAttrs['data_followup'];
       
       if (resumoAtividade || dataFollowup) {
-        console.log(`[dispatcher-multi] Criando atividade FOLLOWUP via atributos: resumo="${resumoAtividade}", data="${dataFollowup}"`);
-        
-        // Converter data_followup para formato ISO se necessário
         let dataPrevista: string | null = null;
         if (dataFollowup) {
           try {
-            // Tentar parsear diferentes formatos de data
             const parsedDate = new Date(dataFollowup);
             if (!isNaN(parsedDate.getTime())) {
               dataPrevista = parsedDate.toISOString().split('T')[0];
             }
-          } catch (e) {
-            console.warn(`[dispatcher-multi] Falha ao parsear data_followup: ${dataFollowup}`);
-          }
+          } catch (e) {}
         }
         
         await supabase.from('atividades_cards').insert({
@@ -667,16 +654,11 @@ Deno.serve(async (req) => {
         event_type: eventType,
         latency_ms: Date.now() - startTime,
         payload: { 
-          payload_format: payloadFormat,
-          match_strategy: matchStrategy,
-          label: labels[0] || null,
           funil: final_funil_nome, 
-          tipo: tipoFunil,
           etapa: final_etapa_nome, 
-          dataRetorno: dataRetornoFinal,
-          contactName,
-          contactId,
-          contactPhone
+          avatarLead: !!avatarLeadUrl,
+          avatarAgente: !!avatarAgenteUrl,
+          telefone: telefoneLead
         },
       });
 
@@ -686,11 +668,8 @@ Deno.serve(async (req) => {
       );
     }
 
-    // HANDLER: conversation_created (CRIAR CARD NOVO)
+    // ========== HANDLER: conversation_created ==========
     if (eventType === 'conversation_created') {
-      console.log('[conversation_created] Iniciando criação de card:', { conversationId, final_funil_nome, contactName });
-
-      // 1. Preparar dados do card
       const cardData = {
         chatwoot_conversa_id: conversationId,
         funil_id: funilId,
@@ -698,13 +677,15 @@ Deno.serve(async (req) => {
         funil_nome: final_funil_nome,
         funil_etapa: final_etapa_nome,
         titulo: contactName || `Conversa #${conversationId}`,
-        resumo: contactPhone ? `Tel: ${contactPhone}` : null,
         status: 'em_andamento',
         data_retorno: dataRetornoFinal,
-        last_chatwoot_sync_at: new Date().toISOString()
+        last_chatwoot_sync_at: new Date().toISOString(),
+        // ENRIQUECIMENTO
+        avatar_lead_url: avatarLeadUrl,
+        avatar_agente_url: avatarAgenteUrl,
+        telefone_lead: telefoneLead,
       };
 
-      // 2. Tentar inserir (Upsert seguro)
       const { data: card, error: upsertError } = await supabase
         .from('cards_conversas')
         .upsert(cardData, { onConflict: 'chatwoot_conversa_id' })
@@ -712,7 +693,6 @@ Deno.serve(async (req) => {
         .single();
 
       if (upsertError) {
-        console.error('[conversation_created] Erro ao criar card:', upsertError);
         await supabase.from('webhook_sync_logs').insert({
           sync_type: 'chatwoot_to_lovable',
           event_type: 'conversation_created',
@@ -720,12 +700,10 @@ Deno.serve(async (req) => {
           conversation_id: conversationId,
           error_message: upsertError.message,
           latency_ms: Date.now() - startTime,
-          payload: { funil: final_funil_nome, contact: contactName }
         });
         throw upsertError;
       }
 
-      // 3. Log de sucesso
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
         event_type: 'conversation_created',
@@ -736,39 +714,30 @@ Deno.serve(async (req) => {
         payload: { funil: final_funil_nome, etapa: final_etapa_nome, contact: contactName }
       });
 
-      console.log('[conversation_created] Card criado com sucesso:', card.id);
-
       return new Response(
-        JSON.stringify({ success: true, message: 'Card created from conversation_created', card_id: card.id }),
+        JSON.stringify({ success: true, message: 'Card created', card_id: card.id }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Handler para message_created e message_updated (mensagens públicas e privadas)
+    // ========== HANDLER: message_created / message_updated ==========
     if (eventType === 'message_created' || eventType === 'message_updated') {
       const messageContent = payload.content || payload.message?.content || '';
       const isPrivate = payload.private === true || payload.message?.private === true;
       const messageId = payload.id || payload.message?.id;
-      const messageType = payload.message_type || payload.message?.message_type;
       
-      console.log(`[dispatcher-multi] message event - private: ${isPrivate}, messageType: ${messageType}, messageId: ${messageId}, content: ${messageContent?.substring(0, 100)}`);
-      
-      // Buscar card existente ANTES de qualquer processamento
       let { data: cardExists } = await supabase
         .from('cards_conversas')
         .select('id')
         .eq('chatwoot_conversa_id', conversationId)
         .maybeSingle();
 
-      // ====== NOVA LÓGICA: SE TEM LABEL VÁLIDA, CRIAR CARD PRIMEIRO ======
       const hasValidLabels = labels && labels.length > 0 && labelFunil;
       const hasValidWebhookPath = webhookConfig?.name && final_funil_nome !== 'Comercial';
       const hasValidCriteria = hasValidLabels || hasValidWebhookPath;
 
-      // Se NÃO existe card MAS tem critério válido (label/path), CRIAR CARD AGORA
+      // Auto-criar card se tem critério válido
       if (!cardExists && hasValidCriteria) {
-        console.log(`[AUTO-CREATE] Criando card para mensagem com critério válido. ConversationId: ${conversationId}, Funil: ${final_funil_nome}, Critério: ${hasValidLabels ? 'label' : 'webhook_path'}, isPrivate: ${isPrivate}`);
-        
         const cardData = {
           chatwoot_conversa_id: conversationId,
           funil_id: funilId,
@@ -776,10 +745,12 @@ Deno.serve(async (req) => {
           funil_nome: final_funil_nome,
           funil_etapa: final_etapa_nome,
           titulo: contactName || `Conversa #${conversationId}`,
-          resumo: contactPhone ? `Tel: ${contactPhone}` : null,
           status: 'em_andamento',
           data_retorno: dataRetornoFinal,
-          last_chatwoot_sync_at: new Date().toISOString()
+          last_chatwoot_sync_at: new Date().toISOString(),
+          avatar_lead_url: avatarLeadUrl,
+          avatar_agente_url: avatarAgenteUrl,
+          telefone_lead: telefoneLead,
         };
 
         const { data: newCard, error: createError } = await supabase
@@ -788,20 +759,8 @@ Deno.serve(async (req) => {
           .select('id')
           .single();
 
-        if (createError) {
-          console.error(`[AUTO-CREATE] Erro ao criar card:`, createError);
-          await supabase.from('webhook_sync_logs').insert({
-            sync_type: 'chatwoot_to_lovable',
-            conversation_id: conversationId,
-            status: 'error',
-            event_type: 'auto_create_failed',
-            error_message: createError.message,
-            latency_ms: Date.now() - startTime,
-            payload: { funil: final_funil_nome, labels, isPrivate, messageType }
-          });
-        } else {
+        if (!createError) {
           cardExists = newCard;
-          console.log(`[AUTO-CREATE] Card criado com sucesso: ${newCard.id}`);
           
           await supabase.from('webhook_sync_logs').insert({
             sync_type: 'chatwoot_to_lovable',
@@ -810,44 +769,26 @@ Deno.serve(async (req) => {
             status: 'success',
             event_type: 'auto_create_from_message',
             latency_ms: Date.now() - startTime,
-            payload: { 
-              funil: final_funil_nome, 
-              etapa: final_etapa_nome,
-              labels, 
-              isPrivate, 
-              messageType,
-              criteria: hasValidLabels ? 'label' : 'webhook_path'
-            }
+            payload: { funil: final_funil_nome, criteria: hasValidLabels ? 'label' : 'webhook_path' }
           });
         }
       }
 
-      // GUARD: Mensagem privada/outgoing sem card E sem critério válido = IGNORAR
+      // GUARD: Sem card e sem critério válido = IGNORAR
       if (!cardExists && (isPrivate || messageType === 'outgoing')) {
-        console.log(`[SKIP] Mensagem ${isPrivate ? 'privada' : 'outgoing'} sem card e sem critério válido - ignorando. ConversationId: ${conversationId}`);
+        console.log(`[SKIP] Mensagem sem card e sem critério - ignorando`);
+        
         await supabase.from('webhook_sync_logs').insert({
           sync_type: 'chatwoot_to_lovable',
           conversation_id: conversationId,
           status: 'skipped',
           event_type: isPrivate ? 'private_message_ignored' : 'outgoing_message_ignored',
-          error_message: `Mensagem ${isPrivate ? 'privada' : 'de saída'} ignorada: sem card e sem critério válido`,
+          error_message: 'Mensagem ignorada: sem card e sem critério válido',
           latency_ms: Date.now() - startTime,
-          payload: {
-            rawInput: rawPayload,
-            decisionContext: {
-              reason: 'Sem card existente e sem critério de classificação',
-              isPrivate,
-              messageType,
-              messageId,
-              labels: labels || [],
-              hasValidLabels,
-              hasValidWebhookPath,
-              webhookPath
-            }
-          }
         });
+        
         return new Response(
-          JSON.stringify({ success: true, message: `Message ignored - no card and no valid criteria`, skipped: true }),
+          JSON.stringify({ success: true, message: 'Message ignored', skipped: true }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -855,27 +796,22 @@ Deno.serve(async (req) => {
       if (cardExists && messageId) {
         // Processar mensagem privada como atividade
         if (isPrivate) {
-          const { error: atividadeError } = await supabase
-            .from('atividades_cards')
-            .insert({
-              card_id: cardExists.id,
-              tipo: 'MENSAGEM_PRIVADA',
-              descricao: messageContent || 'Mensagem privada do Chatwoot',
-              chatwoot_message_id: messageId,
-              privado: true
-            });
+          await supabase.from('atividades_cards').insert({
+            card_id: cardExists.id,
+            tipo: 'MENSAGEM_PRIVADA',
+            descricao: messageContent || 'Mensagem privada do Chatwoot',
+            chatwoot_message_id: messageId,
+            privado: true
+          });
 
-          if (!atividadeError || atividadeError.message?.includes('duplicate')) {
-            await supabase.from('webhook_sync_logs').insert({
-              sync_type: 'chatwoot_to_lovable',
-              conversation_id: conversationId,
-              card_id: cardExists.id,
-              status: 'success',
-              event_type: 'message_created_private',
-              latency_ms: Date.now() - startTime,
-              payload: { messageId, contentPreview: messageContent?.substring(0, 100) }
-            });
-          }
+          await supabase.from('webhook_sync_logs').insert({
+            sync_type: 'chatwoot_to_lovable',
+            conversation_id: conversationId,
+            card_id: cardExists.id,
+            status: 'success',
+            event_type: 'message_created_private',
+            latency_ms: Date.now() - startTime,
+          });
 
           return new Response(
             JSON.stringify({ success: true, message: 'Private message processed', card_id: cardExists.id }),
@@ -883,10 +819,15 @@ Deno.serve(async (req) => {
           );
         }
         
-        // Mensagem pública - apenas atualizar last_chatwoot_sync_at
+        // Mensagem pública - atualizar sync timestamp e dados enriquecidos
+        const updateData: any = { last_chatwoot_sync_at: new Date().toISOString() };
+        if (avatarLeadUrl) updateData.avatar_lead_url = avatarLeadUrl;
+        if (avatarAgenteUrl) updateData.avatar_agente_url = avatarAgenteUrl;
+        if (telefoneLead) updateData.telefone_lead = telefoneLead;
+        
         await supabase
           .from('cards_conversas')
-          .update({ last_chatwoot_sync_at: new Date().toISOString() })
+          .update(updateData)
           .eq('id', cardExists.id);
 
         await supabase.from('webhook_sync_logs').insert({
@@ -896,7 +837,6 @@ Deno.serve(async (req) => {
           status: 'success',
           event_type: 'message_created_public',
           latency_ms: Date.now() - startTime,
-          payload: { messageId, contentPreview: messageContent?.substring(0, 100) }
         });
 
         return new Response(
@@ -905,136 +845,140 @@ Deno.serve(async (req) => {
         );
       }
 
-      // ====== AUTO-HEAL COM CRITÉRIO ESTRITO ======
-      // GUARD CLAUSE 3: Só criar card se houver CRITÉRIO VÁLIDO (labels OU webhook_path mapeado)
-      const autoHealHasValidLabels = labels && labels.length > 0 && labelFunil;
-      const autoHealHasValidPath = webhookConfig?.name && final_funil_nome !== 'Comercial'; // Comercial é fallback universal
-      const autoHealHasValidCriteria = autoHealHasValidLabels || autoHealHasValidPath;
+      // Auto-heal com critério estrito
+      if (!cardExists && hasValidCriteria) {
+        const cardData = {
+          chatwoot_conversa_id: conversationId,
+          funil_id: funilId,
+          etapa_id: etapaId,
+          funil_nome: final_funil_nome,
+          funil_etapa: final_etapa_nome,
+          titulo: contactName || `Conversa #${conversationId}`,
+          status: 'em_andamento',
+          data_retorno: dataRetornoFinal,
+          last_chatwoot_sync_at: new Date().toISOString(),
+          avatar_lead_url: avatarLeadUrl,
+          avatar_agente_url: avatarAgenteUrl,
+          telefone_lead: telefoneLead,
+        };
 
-      if (!autoHealHasValidCriteria) {
-        console.log(`[AUTO-HEAL NEGADO] Sem critério de classificação válido. ConversationId: ${conversationId}, Labels: ${labels?.join(',') || 'nenhuma'}, WebhookPath: ${webhookPath}`);
-        await supabase.from('webhook_sync_logs').insert({
-          sync_type: 'chatwoot_to_lovable',
-          conversation_id: conversationId,
-          status: 'skipped',
-          event_type: 'auto_heal_denied',
-          error_message: 'Criação negada: Sem critério de classificação (labels ou path mapeado)',
-          latency_ms: Date.now() - startTime,
-          payload: { 
-            rawInput: rawPayload,
-            decisionContext: {
-              reason: 'Sem labels mapeadas ou webhook_path específico configurado',
-              labels: labels || [], 
-              webhookPath,
-              hasValidLabels,
-              hasValidWebhookPath,
-              labelFunil,
-              webhookConfigName: webhookConfig?.name,
-              messageType,
-              isPrivate: payload?.private || false
-            }
-          }
-        });
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: 'Auto-heal denied: no valid classification criteria',
-            skipped: true,
-            reason: 'Sem labels mapeadas ou webhook_path configurado'
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+        const { data: healedCard, error: healError } = await supabase
+          .from('cards_conversas')
+          .upsert(cardData, { onConflict: 'chatwoot_conversa_id' })
+          .select('id')
+          .single();
 
-      console.log(`[AUTO-HEAL] Criando card com critério válido. ConversationId: ${conversationId}, Funil: ${final_funil_nome}, Critério: ${hasValidLabels ? 'label' : 'webhook_path'}`);
+        if (healError) {
+          return new Response(
+            JSON.stringify({ error: 'Failed to auto-heal card' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
 
-      // 1. Preparar dados do card (reutilizando variáveis do escopo)
-      const cardData = {
-        chatwoot_conversa_id: conversationId,
-        funil_id: funilId,
-        etapa_id: etapaId,
-        funil_nome: final_funil_nome,
-        funil_etapa: final_etapa_nome,
-        titulo: contactName || `Conversa #${conversationId}`,
-        resumo: contactPhone ? `Tel: ${contactPhone}` : null,
-        status: 'em_andamento',
-        data_retorno: dataRetornoFinal,
-        last_chatwoot_sync_at: new Date().toISOString()
-      };
-
-      // 2. Criar card (Upsert seguro contra race condition)
-      const { data: healedCard, error: healError } = await supabase
-        .from('cards_conversas')
-        .upsert(cardData, { onConflict: 'chatwoot_conversa_id' })
-        .select('id')
-        .single();
-
-      if (healError) {
-        console.error('[AUTO-HEAL] Falha:', healError);
-        await supabase.from('webhook_sync_logs').insert({
-          sync_type: 'chatwoot_to_lovable',
-          event_type: 'auto_heal_failed',
-          status: 'error',
-          conversation_id: conversationId,
-          error_message: healError.message,
-          latency_ms: Date.now() - startTime,
-          payload: {
-            rawInput: rawPayload,
-            decisionContext: {
-              reason: 'Erro ao criar card via auto-heal',
-              errorDetails: healError.message,
-              funil: final_funil_nome,
-              etapa: final_etapa_nome,
-              labels: labels || [],
-              webhookPath
-            }
-          }
-        });
-        return new Response(
-          JSON.stringify({ error: 'Failed to auto-heal card' }),
-          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      // 3. Log de sucesso
-      await supabase.from('webhook_sync_logs').insert({
-        sync_type: 'chatwoot_to_lovable',
-        event_type: 'auto_heal_card_created',
-        status: 'success',
-        conversation_id: conversationId,
-        card_id: healedCard.id,
-        latency_ms: Date.now() - startTime,
-        payload: { trigger: eventType, funil: final_funil_nome, etapa: final_etapa_nome }
-      });
-
-      console.log('[AUTO-HEAL] Card criado com sucesso:', healedCard.id);
-
-      // 4. Processar mensagem com card recém-criado
-      if (isPrivate && messageId) {
-        await supabase
-          .from('atividades_cards')
-          .insert({
+        if (isPrivate && messageId) {
+          await supabase.from('atividades_cards').insert({
             card_id: healedCard.id,
             tipo: 'MENSAGEM_PRIVADA',
             descricao: messageContent || 'Mensagem privada do Chatwoot',
             chatwoot_message_id: messageId,
             privado: true
           });
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, message: 'Auto-healed card', card_id: healedCard.id }),
+          { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
+      // Sem critério válido
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        conversation_id: conversationId,
+        status: 'skipped',
+        event_type: 'auto_heal_denied',
+        error_message: 'Sem critério de classificação válido',
+        latency_ms: Date.now() - startTime,
+      });
+
       return new Response(
-        JSON.stringify({ success: true, message: 'Auto-healed card and processed message', card_id: healedCard.id }),
+        JSON.stringify({ success: true, message: 'Auto-heal denied', skipped: true }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // ========== HANDLER: note_created (Atividades Avulsas) ==========
+    if (eventType === 'note_created' || eventType === 'contact_note_created') {
+      const noteContent = payload?.content || payload?.note?.content || payload?.body || '';
+      const contactId = payload?.contact_id || payload?.contact?.id;
+      
+      console.log(`[note_created] Criando atividade avulsa. ContactId: ${contactId}, Content: ${noteContent?.substring(0, 100)}`);
+      
+      // Buscar card existente para este contato (se houver)
+      let linkedCardId: string | null = null;
+      
+      if (conversationId) {
+        const { data: existingCard } = await supabase
+          .from('cards_conversas')
+          .select('id')
+          .eq('chatwoot_conversa_id', conversationId)
+          .maybeSingle();
+        
+        if (existingCard) {
+          linkedCardId = existingCard.id;
+        }
+      }
+      
+      // Criar atividade (card_id pode ser null para atividades avulsas)
+      const { data: atividade, error: atividadeError } = await supabase
+        .from('atividades_cards')
+        .insert({
+          card_id: linkedCardId, // Pode ser null
+          chatwoot_contact_id: contactId,
+          tipo: 'NOTA_CHATWOOT',
+          descricao: noteContent || 'Nota do Chatwoot',
+          status: 'pendente',
+          privado: true,
+        })
+        .select('id')
+        .single();
+      
+      if (atividadeError) {
+        console.error(`[note_created] Erro ao criar atividade:`, atividadeError);
+        
+        await supabase.from('webhook_sync_logs').insert({
+          sync_type: 'chatwoot_to_lovable',
+          conversation_id: conversationId,
+          status: 'error',
+          event_type: 'note_created',
+          error_message: atividadeError.message,
+          latency_ms: Date.now() - startTime,
+        });
+        
+        return new Response(
+          JSON.stringify({ error: 'Failed to create activity from note' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      await supabase.from('webhook_sync_logs').insert({
+        sync_type: 'chatwoot_to_lovable',
+        conversation_id: conversationId,
+        card_id: linkedCardId,
+        status: 'success',
+        event_type: 'note_created_activity',
+        latency_ms: Date.now() - startTime,
+        payload: { atividadeId: atividade.id, contactId, hasLinkedCard: !!linkedCardId }
+      });
+      
+      return new Response(
+        JSON.stringify({ success: true, message: 'Note activity created', atividade_id: atividade.id }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Log detalhado para eventos não tratados
-    console.error(`[UNHANDLED] Event not processed:`, {
-      eventType,
-      conversationId,
-      payloadKeys: payload ? Object.keys(payload) : [],
-      headerEventType: req.headers.get('X-Chatwoot-Event'),
-    });
+    // Log para eventos não tratados
+    console.warn(`[UNHANDLED] Event not processed: ${eventType}`);
 
     await supabase.from('webhook_sync_logs').insert({
       sync_type: 'chatwoot_to_lovable',
@@ -1043,11 +987,6 @@ Deno.serve(async (req) => {
       event_type: eventType,
       error_message: `Event type '${eventType}' not handled`,
       latency_ms: Date.now() - startTime,
-      payload: {
-        eventType,
-        payloadKeys: payload ? Object.keys(payload) : [],
-        rawPayloadPreview: rawPayload ? JSON.stringify(rawPayload).substring(0, 500) : null,
-      }
     });
 
     return new Response(
@@ -1056,13 +995,8 @@ Deno.serve(async (req) => {
     );
 
   } catch (error: unknown) {
-    // ========== REDE DE SEGURANÇA - LOG FORÇADO DE ERRO ==========
     const err = error as Error;
-    console.error('>>> [DISPATCHER-MULTI] FATAL ERROR CAUGHT:', err);
-    console.error('>>> [DISPATCHER-MULTI] Error name:', err?.name);
-    console.error('>>> [DISPATCHER-MULTI] Error message:', err?.message);
-    console.error('>>> [DISPATCHER-MULTI] Error stack:', err?.stack);
-    // ==============================================================
+    console.error('>>> [DISPATCHER-MULTI] FATAL ERROR:', err?.message, err?.stack);
     
     try {
       const supabase = createClient(
@@ -1078,22 +1012,14 @@ Deno.serve(async (req) => {
         event_type: eventType || 'crash_handler',
         error_message: `CRASH: ${String(err?.message || err).substring(0, 400)}`,
         latency_ms: Date.now() - startTime,
-        payload: {
-          errorName: err?.name,
-          errorStack: err?.stack?.substring(0, 500),
-        }
+        payload: { errorName: err?.name, errorStack: err?.stack?.substring(0, 500) }
       });
     } catch (logError) {
-      console.error('>>> [DISPATCHER-MULTI] Failed to log error to DB:', logError);
+      console.error('>>> Failed to log error to DB:', logError);
     }
 
-    // Retornar 200 para evitar retries do N8N/Chatwoot
     return new Response(
-      JSON.stringify({ 
-        error: String(err?.message || err),
-        recovered: true,
-        hint: 'Check Supabase Edge Function logs for details'
-      }),
+      JSON.stringify({ error: String(err?.message || err), recovered: true }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }

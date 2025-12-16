@@ -40,7 +40,8 @@ export type Database = {
       }
       atividades_cards: {
         Row: {
-          card_id: string
+          card_id: string | null
+          chatwoot_contact_id: number | null
           chatwoot_message_id: number | null
           data_conclusao: string | null
           data_criacao: string
@@ -54,7 +55,8 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          card_id: string
+          card_id?: string | null
+          chatwoot_contact_id?: number | null
           chatwoot_message_id?: number | null
           data_conclusao?: string | null
           data_criacao?: string
@@ -68,7 +70,8 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          card_id?: string
+          card_id?: string | null
+          chatwoot_contact_id?: number | null
           chatwoot_message_id?: number | null
           data_conclusao?: string | null
           data_criacao?: string
@@ -175,6 +178,8 @@ export type Database = {
         Row: {
           arquivado: boolean | null
           assigned_to: string | null
+          avatar_agente_url: string | null
+          avatar_lead_url: string | null
           chatwoot_conversa_id: number | null
           created_at: string
           data_retorno: string | null
@@ -202,6 +207,8 @@ export type Database = {
         Insert: {
           arquivado?: boolean | null
           assigned_to?: string | null
+          avatar_agente_url?: string | null
+          avatar_lead_url?: string | null
           chatwoot_conversa_id?: number | null
           created_at?: string
           data_retorno?: string | null
@@ -229,6 +236,8 @@ export type Database = {
         Update: {
           arquivado?: boolean | null
           assigned_to?: string | null
+          avatar_agente_url?: string | null
+          avatar_lead_url?: string | null
           chatwoot_conversa_id?: number | null
           created_at?: string
           data_retorno?: string | null
