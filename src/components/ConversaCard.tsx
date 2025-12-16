@@ -3,8 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Clock, GripVertical } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
+import { useDraggable } from "@dnd-kit/core";
 import type { StatusInfo } from "@/services/cardStatusService";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
@@ -66,15 +65,14 @@ export const ConversaCard = ({
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
-  } = useSortable({ id });
+  } = useDraggable({ id });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
+  const style = transform ? {
+    transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
+    opacity: 0.8,
+    zIndex: 50,
+  } : { opacity: isDragging ? 0.5 : 1 };
 
   // Buscar dados do responsável
   useEffect(() => {
@@ -209,8 +207,10 @@ export const ConversaCard = ({
       {/* Drag Handle - Área separada para arrastar */}
       <div 
         {...listeners}
+        {...attributes}
         data-drag-handle
         className="h-6 bg-muted/50 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted border-b border-border/30"
+        style={{ touchAction: 'none' }}
       >
         <GripVertical className="h-4 w-4 text-muted-foreground/50" />
       </div>

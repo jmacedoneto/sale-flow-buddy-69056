@@ -17,7 +17,6 @@ import DashboardComercial from "./pages/DashboardComercial";
 import DashboardAdministrativo from "./pages/DashboardAdministrativo";
 import Atividades from "./pages/Atividades";
 import Configuracoes from "./pages/Configuracoes";
-import ApiDocs from "./pages/ApiDocs";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -38,7 +37,6 @@ const AppContent = () => {
         <Route path="/dashboard-administrativo" element={<ProtectedRoute><AppLayout><DashboardAdministrativo /></AppLayout></ProtectedRoute>} />
         <Route path="/atividades" element={<ProtectedRoute><AppLayout><Atividades /></AppLayout></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
-        <Route path="/api-docs" element={<AdminRoute><AppLayout><ApiDocs /></AppLayout></AdminRoute>} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>

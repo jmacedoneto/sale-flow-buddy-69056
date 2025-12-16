@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Settings, LayoutDashboard, FileText, BarChart3, Wrench, ListTodo, Menu, Code } from "lucide-react";
+import { Settings, LayoutDashboard, BarChart3, Wrench, ListTodo, Menu } from "lucide-react";
 import { useSystemHealth } from "@/hooks/useSystemHealth";
 import { usePermissions } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
@@ -53,7 +53,6 @@ export const Header = () => {
     { path: "/atividades", label: "Atividades", icon: ListTodo },
     { path: "/dashboard-comercial", label: "Comercial", icon: BarChart3 },
     { path: "/dashboard-administrativo", label: "Administrativo", icon: Wrench },
-    { path: "/api-docs", label: "API Docs", icon: Code, requireAdmin: true },
     { path: "/configuracoes", label: "Configurações", icon: Settings, requireAdmin: true },
   ];
 

@@ -69,6 +69,7 @@ const DraggableCard = ({ atividade, onClick, onCopyPhone }: {
         {...listeners} 
         {...attributes} 
         className="h-5 bg-muted/50 flex items-center justify-center cursor-grab active:cursor-grabbing hover:bg-muted border-b border-border/30"
+        style={{ touchAction: 'none' }}
       >
         <GripVertical className="h-3 w-3 text-muted-foreground/50" />
       </div>
