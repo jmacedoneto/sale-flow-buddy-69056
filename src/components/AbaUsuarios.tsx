@@ -4,10 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Settings, CheckCircle, XCircle, Clock, Key } from "lucide-react";
+import { Shield, Settings, CheckCircle, XCircle, Clock, Key, UserPlus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GerenciarFunisUsuario } from "./GerenciarFunisUsuario";
 import { PermissionsModal } from "./PermissionsModal";
+import { CreateUserModal } from "./CreateUserModal";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUpdateUserStatus } from "@/hooks/useUpdateUserStatus";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,6 +28,7 @@ export const AbaUsuarios = () => {
   const [selectedUser, setSelectedUser] = useState<{ id: string; nome: string } | null>(null);
   const [statusTab, setStatusTab] = useState<'todos' | 'pending' | 'approved' | 'blocked'>('todos');
   const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
+  const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
   const [userForPermissions, setUserForPermissions] = useState<{
     id: string;
     nome?: string;
@@ -112,9 +114,15 @@ export const AbaUsuarios = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold">👥 Gestão de Usuários</h2>
-        <p className="text-muted-foreground">Aprove usuários e gerencie permissões</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">👥 Gestão de Usuários</h2>
+          <p className="text-muted-foreground">Aprove usuários e gerencie permissões</p>
+        </div>
+        <Button onClick={() => setCreateUserModalOpen(true)}>
+          <UserPlus className="h-4 w-4 mr-2" />
+          Novo Usuário
+        </Button>
       </div>
 
       <Tabs value={statusTab} onValueChange={(v) => setStatusTab(v as typeof statusTab)}>
@@ -282,6 +290,11 @@ export const AbaUsuarios = () => {
           initialPermissions={userForPermissions.permissions}
         />
       )}
+
+      <CreateUserModal
+        isOpen={createUserModalOpen}
+        onClose={() => setCreateUserModalOpen(false)}
+      />
     </div>
   );
 };
