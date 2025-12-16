@@ -38,6 +38,48 @@ export type Database = {
         }
         Relationships: []
       }
+      api_keys: {
+        Row: {
+          active: boolean | null
+          created_at: string
+          expires_at: string | null
+          id: string
+          key_hash: string
+          key_prefix: string
+          last_used_at: string | null
+          name: string
+          scopes: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash: string
+          key_prefix: string
+          last_used_at?: string | null
+          name: string
+          scopes?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean | null
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          last_used_at?: string | null
+          name?: string
+          scopes?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       atividades_cards: {
         Row: {
           card_id: string | null
@@ -825,32 +867,69 @@ export type Database = {
           ativo: boolean
           config_adicional: Json | null
           created_at: string
+          etapa_destino: string | null
+          etapa_origem: string | null
           evento_chatwoot: string
+          funil_id: string | null
+          headers_customizados: Json | null
           id: string
           nome: string
           updated_at: string
+          url_externa: string | null
         }
         Insert: {
           acao: string
           ativo?: boolean
           config_adicional?: Json | null
           created_at?: string
+          etapa_destino?: string | null
+          etapa_origem?: string | null
           evento_chatwoot: string
+          funil_id?: string | null
+          headers_customizados?: Json | null
           id?: string
           nome: string
           updated_at?: string
+          url_externa?: string | null
         }
         Update: {
           acao?: string
           ativo?: boolean
           config_adicional?: Json | null
           created_at?: string
+          etapa_destino?: string | null
+          etapa_origem?: string | null
           evento_chatwoot?: string
+          funil_id?: string | null
+          headers_customizados?: Json | null
           id?: string
           nome?: string
           updated_at?: string
+          url_externa?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "webhook_config_etapa_destino_fkey"
+            columns: ["etapa_destino"]
+            isOneToOne: false
+            referencedRelation: "etapas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_config_etapa_origem_fkey"
+            columns: ["etapa_origem"]
+            isOneToOne: false
+            referencedRelation: "etapas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "webhook_config_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       webhook_sync_logs: {
         Row: {
