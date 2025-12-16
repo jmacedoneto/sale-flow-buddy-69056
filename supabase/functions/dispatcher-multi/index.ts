@@ -734,66 +734,101 @@ Deno.serve(async (req) => {
       
       console.log(`[dispatcher-multi] message event - private: ${isPrivate}, messageType: ${messageType}, messageId: ${messageId}, content: ${messageContent?.substring(0, 100)}`);
       
-      // ====== GUARD CLAUSE 1: Bloquear mensagens privadas SEM card existente ======
       // Buscar card existente ANTES de qualquer processamento
-      const { data: cardExists } = await supabase
+      let { data: cardExists } = await supabase
         .from('cards_conversas')
         .select('id')
         .eq('chatwoot_conversa_id', conversationId)
         .maybeSingle();
 
-      // GUARD: Mensagem privada sem card = IGNORAR (não criar card para isso)
-      if (isPrivate && !cardExists) {
-        console.log(`[SKIP] Mensagem privada sem card existente - ignorando. ConversationId: ${conversationId}`);
-        await supabase.from('webhook_sync_logs').insert({
-          sync_type: 'chatwoot_to_lovable',
-          conversation_id: conversationId,
-          status: 'skipped',
-          event_type: 'private_message_ignored',
-          error_message: 'Mensagem privada ignorada: card não existe',
-          latency_ms: Date.now() - startTime,
-          payload: {
-            rawInput: rawPayload,
-            decisionContext: {
-              reason: 'Mensagem privada sem card existente',
-              isPrivate: true,
+      // ====== NOVA LÓGICA: SE TEM LABEL VÁLIDA, CRIAR CARD PRIMEIRO ======
+      const hasValidLabels = labels && labels.length > 0 && labelFunil;
+      const hasValidWebhookPath = webhookConfig?.name && final_funil_nome !== 'Comercial';
+      const hasValidCriteria = hasValidLabels || hasValidWebhookPath;
+
+      // Se NÃO existe card MAS tem critério válido (label/path), CRIAR CARD AGORA
+      if (!cardExists && hasValidCriteria) {
+        console.log(`[AUTO-CREATE] Criando card para mensagem com critério válido. ConversationId: ${conversationId}, Funil: ${final_funil_nome}, Critério: ${hasValidLabels ? 'label' : 'webhook_path'}, isPrivate: ${isPrivate}`);
+        
+        const cardData = {
+          chatwoot_conversa_id: conversationId,
+          funil_id: funilId,
+          etapa_id: etapaId,
+          funil_nome: final_funil_nome,
+          funil_etapa: final_etapa_nome,
+          titulo: contactName || `Conversa #${conversationId}`,
+          resumo: contactPhone ? `Tel: ${contactPhone}` : null,
+          status: 'em_andamento',
+          data_retorno: dataRetornoFinal,
+          last_chatwoot_sync_at: new Date().toISOString()
+        };
+
+        const { data: newCard, error: createError } = await supabase
+          .from('cards_conversas')
+          .insert(cardData)
+          .select('id')
+          .single();
+
+        if (createError) {
+          console.error(`[AUTO-CREATE] Erro ao criar card:`, createError);
+          await supabase.from('webhook_sync_logs').insert({
+            sync_type: 'chatwoot_to_lovable',
+            conversation_id: conversationId,
+            status: 'error',
+            event_type: 'auto_create_failed',
+            error_message: createError.message,
+            latency_ms: Date.now() - startTime,
+            payload: { funil: final_funil_nome, labels, isPrivate, messageType }
+          });
+        } else {
+          cardExists = newCard;
+          console.log(`[AUTO-CREATE] Card criado com sucesso: ${newCard.id}`);
+          
+          await supabase.from('webhook_sync_logs').insert({
+            sync_type: 'chatwoot_to_lovable',
+            conversation_id: conversationId,
+            card_id: newCard.id,
+            status: 'success',
+            event_type: 'auto_create_from_message',
+            latency_ms: Date.now() - startTime,
+            payload: { 
+              funil: final_funil_nome, 
+              etapa: final_etapa_nome,
+              labels, 
+              isPrivate, 
               messageType,
-              messageId,
-              labels: labels || [],
-              webhookPath
+              criteria: hasValidLabels ? 'label' : 'webhook_path'
             }
-          }
-        });
-        return new Response(
-          JSON.stringify({ success: true, message: 'Private message ignored - no existing card', skipped: true }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+          });
+        }
       }
 
-      // ====== GUARD CLAUSE 2: Bloquear mensagens de SAÍDA sem card existente ======
-      if (messageType === 'outgoing' && !cardExists) {
-        console.log(`[SKIP] Mensagem de saída sem card existente - ignorando. ConversationId: ${conversationId}`);
+      // GUARD: Mensagem privada/outgoing sem card E sem critério válido = IGNORAR
+      if (!cardExists && (isPrivate || messageType === 'outgoing')) {
+        console.log(`[SKIP] Mensagem ${isPrivate ? 'privada' : 'outgoing'} sem card e sem critério válido - ignorando. ConversationId: ${conversationId}`);
         await supabase.from('webhook_sync_logs').insert({
           sync_type: 'chatwoot_to_lovable',
           conversation_id: conversationId,
           status: 'skipped',
-          event_type: 'outgoing_message_ignored',
-          error_message: 'Mensagem de saída ignorada: card não existe',
+          event_type: isPrivate ? 'private_message_ignored' : 'outgoing_message_ignored',
+          error_message: `Mensagem ${isPrivate ? 'privada' : 'de saída'} ignorada: sem card e sem critério válido`,
           latency_ms: Date.now() - startTime,
           payload: {
             rawInput: rawPayload,
             decisionContext: {
-              reason: 'Mensagem de saída sem card existente',
+              reason: 'Sem card existente e sem critério de classificação',
               isPrivate,
               messageType,
               messageId,
               labels: labels || [],
+              hasValidLabels,
+              hasValidWebhookPath,
               webhookPath
             }
           }
         });
         return new Response(
-          JSON.stringify({ success: true, message: 'Outgoing message ignored - no existing card', skipped: true }),
+          JSON.stringify({ success: true, message: `Message ignored - no card and no valid criteria`, skipped: true }),
           { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
