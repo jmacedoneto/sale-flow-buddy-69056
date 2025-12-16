@@ -62,7 +62,7 @@ const DraggableCard = ({ atividade, onClick, onCopyPhone }: {
     <Card 
       ref={setNodeRef} 
       style={style} 
-      className="mb-3 hover:shadow-lg transition-all duration-200 bg-card/80 backdrop-blur-sm border-border/50 rounded-xl overflow-hidden"
+      className="mb-3 hover:shadow-lg transition-all duration-200 bg-card/90 dark:bg-slate-700/95 backdrop-blur-sm border-border/50 rounded-xl overflow-hidden"
     >
       {/* Drag Handle */}
       <div 

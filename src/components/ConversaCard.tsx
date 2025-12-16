@@ -199,7 +199,7 @@ export const ConversaCard = ({
       className="p-0
         hover:shadow-xl hover:scale-[1.02] hover:border-primary/30 
         transition-all duration-200 
-        bg-card/80 backdrop-blur-sm border-border/50 
+        bg-card/90 dark:bg-slate-700/95 backdrop-blur-sm border-border/50 
         group relative rounded-xl overflow-hidden"
       onClick={handleClick}
     >
