@@ -444,6 +444,8 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                     conversationId={card.chatwoot_conversa_id}
                     cardId={card.id}
                     funilId={card.funil_id}
+                    avatarLeadUrl={card.avatar_lead_url}
+                    avatarAgenteUrl={card.avatar_agente_url}
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-muted-foreground">

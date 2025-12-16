@@ -227,6 +227,7 @@ export type Database = {
           data_retorno: string | null
           descricao_detalhada: string | null
           etapa_id: string | null
+          etapa_origem_id: string | null
           funil_etapa: string | null
           funil_id: string | null
           funil_nome: string | null
@@ -256,6 +257,7 @@ export type Database = {
           data_retorno?: string | null
           descricao_detalhada?: string | null
           etapa_id?: string | null
+          etapa_origem_id?: string | null
           funil_etapa?: string | null
           funil_id?: string | null
           funil_nome?: string | null
@@ -285,6 +287,7 @@ export type Database = {
           data_retorno?: string | null
           descricao_detalhada?: string | null
           etapa_id?: string | null
+          etapa_origem_id?: string | null
           funil_etapa?: string | null
           funil_id?: string | null
           funil_nome?: string | null
@@ -315,6 +318,13 @@ export type Database = {
           {
             foreignKeyName: "cards_conversas_etapa_id_fkey"
             columns: ["etapa_id"]
+            isOneToOne: false
+            referencedRelation: "etapas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cards_conversas_etapa_origem_id_fkey"
+            columns: ["etapa_origem_id"]
             isOneToOne: false
             referencedRelation: "etapas"
             referencedColumns: ["id"]
