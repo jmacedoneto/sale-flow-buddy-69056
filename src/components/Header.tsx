@@ -55,31 +55,36 @@ export const Header = () => {
   const navItems = allNavItems.filter(item => !item.requireAdmin || isAdmin);
 
   return (
-    <header className="border-b border-border bg-card/95 backdrop-blur sticky top-0 z-50 shadow-sm">
+    <header className="border-b border-border/50 bg-card/80 backdrop-blur-xl sticky top-0 z-50 shadow-card">
       <div className="container mx-auto px-4 md:px-6 py-3">
         <div className="flex items-center justify-between gap-4">
           {/* Logo e Status */}
           <div className="flex items-center gap-3">
-            <Link to="/dashboard" className="flex items-center gap-2 hover:opacity-80 transition-opacity">
-              <LayoutDashboard className="h-6 w-6 text-primary" />
+            <Link to="/dashboard" className="flex items-center gap-3 hover:opacity-90 transition-opacity group">
+              <div className="h-9 w-9 rounded-xl bg-gradient-primary flex items-center justify-center shadow-elegant group-hover:shadow-glow transition-shadow">
+                <LayoutDashboard className="h-5 w-5 text-white" />
+              </div>
               <div>
-                <h1 className="text-lg md:text-xl font-bold text-foreground">CRM APVS</h1>
-                <p className="text-xs text-muted-foreground hidden md:block">
-                  Iguatemi
+                <h1 className="text-lg md:text-xl font-bold text-gradient">Gestão APVS</h1>
+                <p className="text-xs text-muted-foreground hidden md:block font-medium">
+                  IGUATEMI
                 </p>
               </div>
             </Link>
             
             {/* Status Chatwoot */}
-            <div className="hidden md:flex items-center gap-2 ml-4 px-3 py-1 rounded-full bg-muted">
-              <Circle 
-                className={cn(
-                  "h-2 w-2",
-                  isHealthy ? "fill-green-500 text-green-500" : "fill-red-500 text-red-500"
-                )} 
-              />
-              <span className="text-xs text-muted-foreground">
-                {isHealthy ? "Chatwoot OK" : "Chatwoot offline"}
+            <div className={cn(
+              "hidden md:flex items-center gap-2 ml-4 px-3 py-1.5 rounded-full border transition-colors",
+              isHealthy 
+                ? "bg-success/10 border-success/30 text-success" 
+                : "bg-destructive/10 border-destructive/30 text-destructive"
+            )}>
+              <span className={cn(
+                "h-2 w-2 rounded-full animate-pulse",
+                isHealthy ? "bg-success" : "bg-destructive"
+              )} />
+              <span className="text-xs font-medium">
+                {isHealthy ? "Sistema Online" : "Offline"}
               </span>
             </div>
           </div>
