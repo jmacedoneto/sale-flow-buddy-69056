@@ -19,9 +19,10 @@ interface AtividadesListaProps {
   };
   searchTerm: string;
   mostrarConcluidas: boolean;
+  isAdmin?: boolean;
 }
 
-export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: AtividadesListaProps) => {
+export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas, isAdmin = false }: AtividadesListaProps) => {
   const [selectedAtividade, setSelectedAtividade] = useState<any | null>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -41,9 +42,14 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas }: Ativ
             chatwoot_conversa_id,
             funis(nome)
           )
-        `)
-        .not('data_prevista', 'is', null)
-        .order('data_prevista', { ascending: true });
+        `);
+
+      // Só filtrar por data_prevista no modo comercial (não admin)
+      if (!isAdmin) {
+        query = query.not('data_prevista', 'is', null);
+      }
+      
+      query = query.order('data_prevista', { ascending: true });
 
       if (!mostrarConcluidas) {
         query = query.eq('status', 'pendente');

@@ -255,6 +255,7 @@ export default function Atividades() {
               filters={filters}
               searchTerm={searchTerm}
               mostrarConcluidas={mostrarConcluidas}
+              isAdmin={false}
             />
           )
         ) : (
@@ -269,6 +270,7 @@ export default function Atividades() {
               filters={filters}
               searchTerm={searchTerm}
               mostrarConcluidas={mostrarConcluidas}
+              isAdmin={true}
             />
           )
         )}
