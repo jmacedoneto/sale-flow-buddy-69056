@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.chatwoot-text-commands]
 verify_jwt = false
+
+[functions.api-key-auth]
+verify_jwt = false
