@@ -24,7 +24,6 @@ interface ConversaCardProps {
   funilId?: string;
   assignedTo?: string | null;
   avatarLeadUrl?: string | null;
-  avatarAgenteUrl?: string | null;
   leadScore?: number | null;
   leadScoreCategoria?: string | null;
   onClick?: () => void;
@@ -51,7 +50,6 @@ export const ConversaCard = ({
   funilId,
   assignedTo,
   avatarLeadUrl,
-  avatarAgenteUrl,
   leadScore,
   leadScoreCategoria,
   onClick,
@@ -225,6 +223,7 @@ export const ConversaCard = ({
   };
 
   const leadInitials = getInitials(titulo);
+  const responsavelInitials = responsavel ? getInitials(responsavel.nome || '') : '';
 
   return (
     <Card
@@ -245,63 +244,48 @@ export const ConversaCard = ({
       />
 
       <div className="p-4 space-y-3">
-        {/* Header com Avatar do Lead + Avatar do Agente */}
+        {/* Header com Avatar do Responsável CRM como principal */}
         <div className="flex items-start gap-3">
-          <div className="relative">
-            <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
-              {avatarLeadUrl ? (
-                <AvatarImage src={avatarLeadUrl} alt={titulo} />
-              ) : null}
-              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
-                {leadInitials}
-              </AvatarFallback>
-            </Avatar>
-            {/* Avatar do Agente CRM sobreposto */}
-            {avatarAgenteUrl && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Avatar className="h-5 w-5 absolute -bottom-1 -right-1 border-2 border-background shadow-sm">
-                      <AvatarImage src={avatarAgenteUrl} alt="Agente" />
-                      <AvatarFallback className="bg-secondary text-secondary-foreground text-[8px]">
-                        AG
-                      </AvatarFallback>
-                    </Avatar>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p className="text-xs">Agente Chatwoot</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
+          {/* Avatar Principal: Responsável CRM */}
+          <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
+            {responsavel?.avatar_url ? (
+              <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
+            ) : null}
+            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
+              {responsavelInitials || leadInitials}
+            </AvatarFallback>
+          </Avatar>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer">
                 {titulo}
               </h4>
-              {/* Avatar do Responsável no header - substitui #ID */}
-              {responsavel && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Avatar className="h-6 w-6 shrink-0 border border-border shadow-sm">
-                        {responsavel.avatar_url ? (
-                          <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
-                        ) : null}
-                        <AvatarFallback className="bg-primary/10 text-primary text-[9px]">
-                          {getInitials(responsavel.nome || '')}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">
-                      <p className="text-xs">{responsavel.nome || 'Responsável'}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+              {/* Avatar pequeno do Lead/Prospect no canto superior direito */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Avatar className="h-6 w-6 shrink-0 border border-border shadow-sm">
+                      {avatarLeadUrl ? (
+                        <AvatarImage src={avatarLeadUrl} alt={titulo} />
+                      ) : null}
+                      <AvatarFallback className="bg-secondary/50 text-secondary-foreground text-[9px]">
+                        {leadInitials}
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p className="text-xs">Lead: {titulo}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
+            {/* Nome do responsável abaixo do título */}
+            {responsavel?.nome && (
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                Responsável: {responsavel.nome}
+              </p>
+            )}
           </div>
         </div>
         
