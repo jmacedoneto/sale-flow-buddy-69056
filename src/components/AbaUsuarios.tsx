@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Settings, CheckCircle, XCircle, Clock, Key, UserPlus } from "lucide-react";
+import { Shield, Settings, CheckCircle, XCircle, Clock, Key, UserPlus, Save } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { GerenciarFunisUsuario } from "./GerenciarFunisUsuario";
 import { PermissionsModal } from "./PermissionsModal";
@@ -12,6 +12,8 @@ import { CreateUserModal } from "./CreateUserModal";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useUpdateUserStatus } from "@/hooks/useUpdateUserStatus";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 interface PermissionValues {
   criar_card: boolean;
@@ -29,6 +31,8 @@ export const AbaUsuarios = () => {
   const [statusTab, setStatusTab] = useState<'todos' | 'pending' | 'approved' | 'blocked'>('todos');
   const [permissionsModalOpen, setPermissionsModalOpen] = useState(false);
   const [createUserModalOpen, setCreateUserModalOpen] = useState(false);
+  const [editingChatwootId, setEditingChatwootId] = useState<{ [userId: string]: string }>({});
+  const [savingChatwootId, setSavingChatwootId] = useState<string | null>(null);
   const [userForPermissions, setUserForPermissions] = useState<{
     id: string;
     nome?: string;
@@ -38,6 +42,7 @@ export const AbaUsuarios = () => {
 
   const { isAdmin, loading: permissionsLoading } = usePermissions();
   const updateUserStatus = useUpdateUserStatus();
+  const queryClient = useQueryClient();
 
   const { data: users, isLoading } = useQuery({
     queryKey: ['users'],
@@ -54,6 +59,48 @@ export const AbaUsuarios = () => {
     },
     enabled: isAdmin
   });
+
+  const handleSaveChatwootId = async (userId: string, currentValue: number | null) => {
+    const newValue = editingChatwootId[userId];
+    const parsedValue = newValue ? parseInt(newValue, 10) : null;
+    
+    if (newValue && isNaN(parsedValue as number)) {
+      toast.error("ID Chatwoot deve ser um número");
+      return;
+    }
+
+    if (parsedValue === currentValue) {
+      setEditingChatwootId(prev => {
+        const updated = { ...prev };
+        delete updated[userId];
+        return updated;
+      });
+      return;
+    }
+
+    setSavingChatwootId(userId);
+    try {
+      const { error } = await supabase
+        .from('users_crm')
+        .update({ chatwoot_agent_id: parsedValue })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      toast.success("ID Chatwoot atualizado com sucesso");
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setEditingChatwootId(prev => {
+        const updated = { ...prev };
+        delete updated[userId];
+        return updated;
+      });
+    } catch (error) {
+      console.error('Erro ao salvar ID Chatwoot:', error);
+      toast.error("Erro ao salvar ID Chatwoot");
+    } finally {
+      setSavingChatwootId(null);
+    }
+  };
 
   const getRoleBadgeVariant = (role: string) => {
     switch (role) {
@@ -149,6 +196,7 @@ export const AbaUsuarios = () => {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Email</TableHead>
+                    <TableHead>ID Chatwoot</TableHead>
                     <TableHead>Função</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Ações</TableHead>
@@ -160,6 +208,29 @@ export const AbaUsuarios = () => {
                     <TableRow key={user.id}>
                       <TableCell className="font-medium">{user.nome || '—'}</TableCell>
                       <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            placeholder="ID"
+                            className="w-20 h-8 text-sm"
+                            value={editingChatwootId[user.id] ?? (user.chatwoot_agent_id?.toString() || '')}
+                            onChange={(e) => setEditingChatwootId(prev => ({ ...prev, [user.id]: e.target.value }))}
+                          />
+                          {editingChatwootId[user.id] !== undefined && 
+                           editingChatwootId[user.id] !== (user.chatwoot_agent_id?.toString() || '') && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-8 w-8 p-0"
+                              onClick={() => handleSaveChatwootId(user.id, user.chatwoot_agent_id)}
+                              disabled={savingChatwootId === user.id}
+                            >
+                              <Save className="h-4 w-4 text-primary" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={getRoleBadgeVariant(user.role || 'agent')}>
                           {getRoleLabel(user.role || 'agent')}
