@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AvatarUpload } from "./AvatarUpload";
-import { Save, User } from "lucide-react";
+import { Save, User, Link2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 export const AbaPerfilUsuario = () => {
@@ -16,6 +16,7 @@ export const AbaPerfilUsuario = () => {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [chatwootAgentId, setChatwootAgentId] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -26,7 +27,7 @@ export const AbaPerfilUsuario = () => {
       setIsLoading(true);
       const { data, error } = await supabase
         .from('users_crm')
-        .select('nome, email, avatar_url')
+        .select('nome, email, avatar_url, chatwoot_agent_id')
         .eq('id', user.id)
         .single();
       
@@ -34,6 +35,7 @@ export const AbaPerfilUsuario = () => {
         setNome(data.nome || "");
         setEmail(data.email || "");
         setAvatarUrl(data.avatar_url);
+        setChatwootAgentId(data.chatwoot_agent_id?.toString() || "");
       }
       
       if (error) {
@@ -52,9 +54,14 @@ export const AbaPerfilUsuario = () => {
     setIsSaving(true);
     
     try {
+      const updateData: { nome: string; chatwoot_agent_id: number | null } = {
+        nome: nome.trim(),
+        chatwoot_agent_id: chatwootAgentId ? parseInt(chatwootAgentId, 10) : null
+      };
+
       const { error } = await supabase
         .from('users_crm')
-        .update({ nome: nome.trim() })
+        .update(updateData)
         .eq('id', user.id);
       
       if (error) throw error;
@@ -131,7 +138,7 @@ export const AbaPerfilUsuario = () => {
           <CardHeader>
             <CardTitle>Informações Pessoais</CardTitle>
             <CardDescription>
-              Atualize seu nome de exibição
+              Atualize seu nome de exibição e vincule ao Chatwoot
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -155,6 +162,23 @@ export const AbaPerfilUsuario = () => {
               />
               <p className="text-xs text-muted-foreground">
                 O e-mail não pode ser alterado
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="chatwoot_agent_id" className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                ID Agente Chatwoot
+              </Label>
+              <Input
+                id="chatwoot_agent_id"
+                type="number"
+                value={chatwootAgentId}
+                onChange={(e) => setChatwootAgentId(e.target.value)}
+                placeholder="Ex: 123"
+              />
+              <p className="text-xs text-muted-foreground">
+                Vincule seu usuário ao agente do Chatwoot para sincronização automática de cards
               </p>
             </div>
 

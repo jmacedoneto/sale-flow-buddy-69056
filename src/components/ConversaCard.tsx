@@ -244,15 +244,15 @@ export const ConversaCard = ({
       />
 
       <div className="p-4 space-y-3">
-        {/* Header com Avatar do Responsável CRM como principal */}
+      {/* Header com Avatar do Lead como principal */}
         <div className="flex items-start gap-3">
-          {/* Avatar Principal: Responsável CRM */}
+          {/* Avatar Principal: Lead/Cliente do Chatwoot */}
           <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
-            {responsavel?.avatar_url ? (
-              <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
+            {avatarLeadUrl ? (
+              <AvatarImage src={avatarLeadUrl} alt={titulo} />
             ) : null}
             <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
-              {responsavelInitials || leadInitials}
+              {leadInitials}
             </AvatarFallback>
           </Avatar>
           
@@ -261,24 +261,26 @@ export const ConversaCard = ({
               <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer">
                 {titulo}
               </h4>
-              {/* Avatar pequeno do Lead/Prospect no canto superior direito */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Avatar className="h-6 w-6 shrink-0 border border-border shadow-sm">
-                      {avatarLeadUrl ? (
-                        <AvatarImage src={avatarLeadUrl} alt={titulo} />
-                      ) : null}
-                      <AvatarFallback className="bg-secondary/50 text-secondary-foreground text-[9px]">
-                        {leadInitials}
-                      </AvatarFallback>
-                    </Avatar>
-                  </TooltipTrigger>
-                  <TooltipContent side="left">
-                    <p className="text-xs">Lead: {titulo}</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              {/* Avatar pequeno do Responsável CRM no canto superior direito */}
+              {responsavel && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Avatar className="h-6 w-6 shrink-0 border border-border shadow-sm">
+                        {responsavel.avatar_url ? (
+                          <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
+                        ) : null}
+                        <AvatarFallback className="bg-secondary/50 text-secondary-foreground text-[9px]">
+                          {responsavelInitials}
+                        </AvatarFallback>
+                      </Avatar>
+                    </TooltipTrigger>
+                    <TooltipContent side="left">
+                      <p className="text-xs">Responsável: {responsavel.nome}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
             </div>
             {/* Nome do responsável abaixo do título */}
             {responsavel?.nome && (
