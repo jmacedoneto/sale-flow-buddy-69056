@@ -51,6 +51,7 @@ export const ConversaCard = ({
   funilId,
   assignedTo,
   avatarLeadUrl,
+  avatarAgenteUrl,
   leadScore,
   leadScoreCategoria,
   onClick,
@@ -244,16 +245,36 @@ export const ConversaCard = ({
       />
 
       <div className="p-4 space-y-3">
-        {/* Header com Avatar do Lead */}
+        {/* Header com Avatar do Lead + Avatar do Agente */}
         <div className="flex items-start gap-3">
-          <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
-            {avatarLeadUrl ? (
-              <AvatarImage src={avatarLeadUrl} alt={titulo} />
-            ) : null}
-            <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
-              {leadInitials}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative">
+            <Avatar className="h-10 w-10 shrink-0 border-2 border-primary/20 shadow-sm">
+              {avatarLeadUrl ? (
+                <AvatarImage src={avatarLeadUrl} alt={titulo} />
+              ) : null}
+              <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/5 text-primary text-xs font-semibold">
+                {leadInitials}
+              </AvatarFallback>
+            </Avatar>
+            {/* Avatar do Agente CRM sobreposto */}
+            {avatarAgenteUrl && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Avatar className="h-5 w-5 absolute -bottom-1 -right-1 border-2 border-background shadow-sm">
+                      <AvatarImage src={avatarAgenteUrl} alt="Agente" />
+                      <AvatarFallback className="bg-secondary text-secondary-foreground text-[8px]">
+                        AG
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p className="text-xs">Agente Chatwoot</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+          </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">

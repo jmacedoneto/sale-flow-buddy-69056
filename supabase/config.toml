@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.cards-api]
 verify_jwt = false
+
+[functions.ai-lead-score]
+verify_jwt = false
+
+[functions.dispatcher-automations]
+verify_jwt = false

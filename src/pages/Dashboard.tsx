@@ -472,6 +472,10 @@ const Dashboard = () => {
                       chatwootConversaId={activeCard.chatwoot_conversa_id || undefined}
                       createdAt={activeCard.created_at || new Date().toISOString()}
                       statusInfo={activeCard.statusInfo}
+                      avatarLeadUrl={(activeCard as any).avatar_lead_url}
+                      avatarAgenteUrl={(activeCard as any).avatar_agente_url}
+                      leadScore={(activeCard as any).lead_score}
+                      leadScoreCategoria={(activeCard as any).lead_score_categoria}
                     />
                   </div>
                 ) : null}
