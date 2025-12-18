@@ -357,18 +357,6 @@ const Dashboard = () => {
                 </span>
               </Button>
 
-              {/* Page Size Selector */}
-              <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
-                <SelectTrigger className="w-[100px] h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="50">50 itens</SelectItem>
-                  <SelectItem value="100">100 itens</SelectItem>
-                  <SelectItem value="500">500 itens</SelectItem>
-                  <SelectItem value="1000">1000 itens</SelectItem>
-                </SelectContent>
-              </Select>
               
               {/* Refresh */}
               <Button 
@@ -487,12 +475,31 @@ const Dashboard = () => {
           )}
         </div>
 
-        {/* Paginação */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card/50">
-            <p className="text-sm text-muted-foreground">
-              Mostrando {currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, totalCards)} de {totalCards}
-            </p>
+        {/* Barra inferior: Seletor de itens à esquerda, Paginação à direita */}
+        <div className="flex items-center justify-between px-4 py-3 border-t border-border bg-card/50">
+          {/* Seletor de itens por página - Inferior esquerda */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Exibir:</span>
+            <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
+              <SelectTrigger className="w-[100px] h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="50">50 itens</SelectItem>
+                <SelectItem value="100">100 itens</SelectItem>
+                <SelectItem value="500">500 itens</SelectItem>
+                <SelectItem value="1000">1000 itens</SelectItem>
+              </SelectContent>
+            </Select>
+            {totalCards > 0 && (
+              <span className="text-sm text-muted-foreground">
+                ({currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, totalCards)} de {totalCards})
+              </span>
+            )}
+          </div>
+
+          {/* Paginação - Direita */}
+          {totalPages > 1 && (
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -514,8 +521,8 @@ const Dashboard = () => {
                 Próxima →
               </Button>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Modals */}

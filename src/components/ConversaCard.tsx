@@ -258,29 +258,29 @@ export const ConversaCard = ({
           
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2">
-              <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer">
+              <h4 className="font-medium text-sm text-foreground line-clamp-2 group-hover:text-primary transition-colors cursor-pointer flex-1">
                 {titulo}
               </h4>
-              {/* Avatar pequeno do Responsável CRM no canto superior direito */}
-              {responsavel && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Avatar className="h-6 w-6 shrink-0 border border-border shadow-sm">
-                        {responsavel.avatar_url ? (
-                          <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
-                        ) : null}
-                        <AvatarFallback className="bg-secondary/50 text-secondary-foreground text-[9px]">
-                          {responsavelInitials}
-                        </AvatarFallback>
-                      </Avatar>
-                    </TooltipTrigger>
-                    <TooltipContent side="left">
-                      <p className="text-xs">Responsável: {responsavel.nome}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
+              {/* Avatar pequeno do Responsável CRM - sempre visível no canto superior direito */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Avatar className="h-6 w-6 shrink-0 border-2 border-primary/30 shadow-sm ring-1 ring-background">
+                      {responsavel?.avatar_url ? (
+                        <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || 'Responsável'} />
+                      ) : null}
+                      <AvatarFallback className="bg-gradient-to-br from-secondary to-secondary/50 text-secondary-foreground text-[9px] font-semibold">
+                        {responsavel ? responsavelInitials : '?'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </TooltipTrigger>
+                  <TooltipContent side="left">
+                    <p className="text-xs">
+                      {responsavel ? `Responsável: ${responsavel.nome}` : 'Sem responsável atribuído'}
+                    </p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
             {/* Nome do responsável abaixo do título */}
             {responsavel?.nome && (
