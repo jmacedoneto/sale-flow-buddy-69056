@@ -14,6 +14,7 @@ interface AutomacaoConfig {
     evento: string;
     funil_origem?: string;
     etapa_destino?: string;
+    score_minimo?: number;
   };
   acao: {
     tipo: string;
@@ -21,6 +22,8 @@ interface AutomacaoConfig {
     etapa_destino?: string;
     dias_prazo?: number;
     tipo_tarefa?: string;
+    url_webhook?: string;
+    agente_id?: string;
   };
   ativo: boolean;
 }
@@ -31,6 +34,7 @@ interface DispatcherPayload {
   funil_id?: string;
   etapa_id?: string;
   etapa_anterior?: string;
+  lead_score?: number;
   dados_extras?: Record<string, any>;
 }
 
@@ -85,6 +89,13 @@ serve(async (req) => {
         shouldExecute = false;
       }
 
+      // Verificar score mínimo para lead_score_changed
+      if (gatilho.evento === 'lead_score_changed' && gatilho.score_minimo) {
+        if (!payload.lead_score || payload.lead_score < gatilho.score_minimo) {
+          shouldExecute = false;
+        }
+      }
+
       if (!shouldExecute) continue;
 
       console.log(`[dispatcher-automations] Executando automação: ${automacao.nome}`);
@@ -108,7 +119,7 @@ serve(async (req) => {
               .eq('id', acao.etapa_destino)
               .single();
 
-            await supabase
+            const { error: updateError } = await supabase
               .from('cards_conversas')
               .update({
                 funil_id: acao.funil_destino,
@@ -119,7 +130,11 @@ serve(async (req) => {
               })
               .eq('id', payload.card_id);
 
-            executedAutomations.push(`${automacao.nome} - Card movido`);
+            if (updateError) {
+              console.error('[dispatcher-automations] Erro ao mover card:', updateError);
+            } else {
+              executedAutomations.push(`${automacao.nome} - Card movido para ${funil?.nome}/${etapa?.nome}`);
+            }
           }
           break;
 
@@ -128,7 +143,7 @@ serve(async (req) => {
             const dataPrevista = new Date();
             dataPrevista.setDate(dataPrevista.getDate() + (acao.dias_prazo || 1));
 
-            await supabase
+            const { error: insertError } = await supabase
               .from('atividades_cards')
               .insert({
                 card_id: payload.card_id,
@@ -138,16 +153,19 @@ serve(async (req) => {
                 status: 'pendente',
               });
 
-            executedAutomations.push(`${automacao.nome} - Tarefa criada`);
+            if (insertError) {
+              console.error('[dispatcher-automations] Erro ao criar tarefa:', insertError);
+            } else {
+              executedAutomations.push(`${automacao.nome} - Tarefa criada`);
+            }
           }
           break;
 
         case 'recalcular_score':
           if (payload.card_id) {
-            // Chamar edge function de lead score
             try {
               const baseUrl = supabaseUrl.replace('.supabase.co', '.functions.supabase.co');
-              await fetch(`${baseUrl}/ai-lead-score`, {
+              const response = await fetch(`${baseUrl}/ai-lead-score`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -155,9 +173,84 @@ serve(async (req) => {
                 },
                 body: JSON.stringify({ card_id: payload.card_id }),
               });
-              executedAutomations.push(`${automacao.nome} - Score recalculado`);
+
+              if (response.ok) {
+                executedAutomations.push(`${automacao.nome} - Score recalculado`);
+              } else {
+                console.error('[dispatcher-automations] Erro ao recalcular score:', await response.text());
+              }
             } catch (scoreError) {
               console.error('[dispatcher-automations] Erro ao recalcular score:', scoreError);
+            }
+          }
+          break;
+
+        case 'disparar_webhook':
+          if (acao.url_webhook) {
+            try {
+              // Buscar dados completos do card se existir
+              let cardData = null;
+              if (payload.card_id) {
+                const { data } = await supabase
+                  .from('cards_conversas')
+                  .select('*')
+                  .eq('id', payload.card_id)
+                  .single();
+                cardData = data;
+              }
+
+              const webhookPayload = {
+                evento: payload.evento,
+                card_id: payload.card_id,
+                card: cardData,
+                funil_id: payload.funil_id,
+                etapa_id: payload.etapa_id,
+                lead_score: payload.lead_score,
+                automacao: automacao.nome,
+                timestamp: new Date().toISOString(),
+              };
+
+              console.log(`[dispatcher-automations] Disparando webhook para: ${acao.url_webhook}`);
+              
+              const response = await fetch(acao.url_webhook, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(webhookPayload),
+              });
+
+              if (response.ok) {
+                executedAutomations.push(`${automacao.nome} - Webhook disparado (${response.status})`);
+              } else {
+                console.error(`[dispatcher-automations] Webhook retornou erro: ${response.status}`);
+                executedAutomations.push(`${automacao.nome} - Webhook falhou (${response.status})`);
+              }
+            } catch (webhookError) {
+              console.error('[dispatcher-automations] Erro ao disparar webhook:', webhookError);
+            }
+          }
+          break;
+
+        case 'atribuir_agente':
+          if (payload.card_id && acao.agente_id) {
+            // Buscar nome do agente
+            const { data: agente } = await supabase
+              .from('users_crm')
+              .select('nome, email')
+              .eq('id', acao.agente_id)
+              .single();
+
+            const { error: atribuirError } = await supabase
+              .from('cards_conversas')
+              .update({ assigned_to: acao.agente_id })
+              .eq('id', payload.card_id);
+
+            if (atribuirError) {
+              console.error('[dispatcher-automations] Erro ao atribuir agente:', atribuirError);
+            } else {
+              const nomeAgente = agente?.nome || agente?.email || 'Agente';
+              executedAutomations.push(`${automacao.nome} - Card atribuído a ${nomeAgente}`);
             }
           }
           break;
