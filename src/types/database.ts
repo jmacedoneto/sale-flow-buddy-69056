@@ -28,6 +28,8 @@ export interface CardConversa {
   assigned_to?: string | null;
   avatar_lead_url?: string | null;
   avatar_agente_url?: string | null;
+  lead_score?: number | null;
+  lead_score_categoria?: string | null;
 }
 
 export interface Funil {

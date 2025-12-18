@@ -233,6 +233,8 @@ export type Database = {
           funil_nome: string | null
           id: string
           last_chatwoot_sync_at: string | null
+          lead_score: number | null
+          lead_score_categoria: string | null
           motivo_perda_id: string | null
           pausado: boolean | null
           prazo: string | null
@@ -263,6 +265,8 @@ export type Database = {
           funil_nome?: string | null
           id?: string
           last_chatwoot_sync_at?: string | null
+          lead_score?: number | null
+          lead_score_categoria?: string | null
           motivo_perda_id?: string | null
           pausado?: boolean | null
           prazo?: string | null
@@ -293,6 +297,8 @@ export type Database = {
           funil_nome?: string | null
           id?: string
           last_chatwoot_sync_at?: string | null
+          lead_score?: number | null
+          lead_score_categoria?: string | null
           motivo_perda_id?: string | null
           pausado?: boolean | null
           prazo?: string | null
@@ -550,6 +556,50 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: []
+      }
+      lead_score_config: {
+        Row: {
+          ativo: boolean | null
+          categoria: string
+          created_at: string | null
+          criterio: string
+          descricao: string | null
+          funil_id: string | null
+          id: string
+          pontos: number
+          updated_at: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          categoria: string
+          created_at?: string | null
+          criterio: string
+          descricao?: string | null
+          funil_id?: string | null
+          id?: string
+          pontos?: number
+          updated_at?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          categoria?: string
+          created_at?: string | null
+          criterio?: string
+          descricao?: string | null
+          funil_id?: string | null
+          id?: string
+          pontos?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_score_config_funil_id_fkey"
+            columns: ["funil_id"]
+            isOneToOne: false
+            referencedRelation: "funis"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       mappings_config: {
         Row: {
@@ -813,6 +863,7 @@ export type Database = {
           approved: boolean | null
           ativo: boolean | null
           avatar_url: string | null
+          chatwoot_agent_id: number | null
           created_at: string | null
           criar_card: boolean | null
           deletar_card: boolean | null
@@ -834,6 +885,7 @@ export type Database = {
           approved?: boolean | null
           ativo?: boolean | null
           avatar_url?: string | null
+          chatwoot_agent_id?: number | null
           created_at?: string | null
           criar_card?: boolean | null
           deletar_card?: boolean | null
@@ -855,6 +907,7 @@ export type Database = {
           approved?: boolean | null
           ativo?: boolean | null
           avatar_url?: string | null
+          chatwoot_agent_id?: number | null
           created_at?: string | null
           criar_card?: boolean | null
           deletar_card?: boolean | null
