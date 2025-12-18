@@ -109,6 +109,8 @@ export const EtapaColumn = ({
               funilId={card.funil_id || undefined}
               assignedTo={(card as any).assigned_to}
               avatarLeadUrl={(card as any).avatar_lead_url}
+              leadScore={(card as any).lead_score}
+              leadScoreCategoria={(card as any).lead_score_categoria}
               onClick={() => onCardClick?.(card)}
               onAgendarClick={() => onAgendarClick?.(card)}
             />

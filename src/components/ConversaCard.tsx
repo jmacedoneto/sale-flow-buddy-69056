@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, Clock } from "lucide-react";
+import { MessageSquare, Clock, Flame, Snowflake, TrendingUp } from "lucide-react";
 import { formatDistanceToNow, differenceInDays, isPast, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useDraggable } from "@dnd-kit/core";
@@ -25,6 +25,8 @@ interface ConversaCardProps {
   assignedTo?: string | null;
   avatarLeadUrl?: string | null;
   avatarAgenteUrl?: string | null;
+  leadScore?: number | null;
+  leadScoreCategoria?: string | null;
   onClick?: () => void;
   onAgendarClick?: () => void;
   onFollowUpCreated?: () => void;
@@ -49,6 +51,8 @@ export const ConversaCard = ({
   funilId,
   assignedTo,
   avatarLeadUrl,
+  leadScore,
+  leadScoreCategoria,
   onClick,
 }: ConversaCardProps) => {
   const [atividadeStatus, setAtividadeStatus] = useState<{
@@ -190,6 +194,35 @@ export const ConversaCard = ({
     );
   };
 
+  const renderLeadScoreBadge = () => {
+    if (!leadScore && leadScore !== 0) return null;
+    
+    const categoria = leadScoreCategoria?.toLowerCase() || '';
+    
+    if (categoria === 'quente' || leadScore >= 70) {
+      return (
+        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-destructive/10 border border-destructive/20">
+          <Flame className="h-3 w-3 text-destructive" />
+          <span className="text-[10px] text-destructive font-medium">Quente</span>
+        </div>
+      );
+    }
+    if (categoria === 'morno' || leadScore >= 40) {
+      return (
+        <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-warning/10 border border-warning/20">
+          <TrendingUp className="h-3 w-3 text-warning" />
+          <span className="text-[10px] text-warning font-medium">Morno</span>
+        </div>
+      );
+    }
+    return (
+      <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20">
+        <Snowflake className="h-3 w-3 text-primary" />
+        <span className="text-[10px] text-primary font-medium">Frio</span>
+      </div>
+    );
+  };
+
   const leadInitials = getInitials(titulo);
 
   return (
@@ -276,7 +309,8 @@ export const ConversaCard = ({
 
         {/* Status Row */}
         <div className="flex items-center justify-between pt-2 border-t border-border/50">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {renderLeadScoreBadge()}
             {renderAtividadeBadge()}
             {renderStatusBadge()}
           </div>

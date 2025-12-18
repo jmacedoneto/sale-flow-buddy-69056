@@ -47,7 +47,16 @@ const Dashboard = () => {
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
   const [currentPage, setCurrentPage] = useState(0);
-  const pageSize = 50;
+  const [pageSize, setPageSize] = useState<number>(() => {
+    const saved = localStorage.getItem('dashboard_page_size');
+    return saved ? parseInt(saved) : 50;
+  });
+
+  // Persistir pageSize
+  useEffect(() => {
+    localStorage.setItem('dashboard_page_size', pageSize.toString());
+    setCurrentPage(0);
+  }, [pageSize]);
   
   // Sidebar collapsed state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -347,6 +356,19 @@ const Dashboard = () => {
                   {sortOrder === "asc" ? "Próximas" : "Distantes"}
                 </span>
               </Button>
+
+              {/* Page Size Selector */}
+              <Select value={pageSize.toString()} onValueChange={(v) => setPageSize(parseInt(v))}>
+                <SelectTrigger className="w-[100px] h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50">50 itens</SelectItem>
+                  <SelectItem value="100">100 itens</SelectItem>
+                  <SelectItem value="500">500 itens</SelectItem>
+                  <SelectItem value="1000">1000 itens</SelectItem>
+                </SelectContent>
+              </Select>
               
               {/* Refresh */}
               <Button 
