@@ -5,10 +5,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Interface para o assignee (agente responsável)
+interface ChatwootAssignee {
+  id: number;
+  name: string;
+  email?: string;
+  avatar_url?: string;
+}
+
 interface ChatwootWebhookPayload {
   event: string;
   conversation?: {
     id: number;
+    assignee?: ChatwootAssignee;
     custom_attributes?: {
       nome_do_funil?: string;
       funil_etapa?: string;
@@ -17,6 +26,7 @@ interface ChatwootWebhookPayload {
       etapa_comercial?: string; // Backward compatibility
     };
   };
+  assignee?: ChatwootAssignee;
 }
 
 Deno.serve(async (req) => {
@@ -85,11 +95,43 @@ Deno.serve(async (req) => {
     const funilEtapa = customAttributes?.funil_etapa || customAttributes?.etapa_comercial;
     const dataRetorno = customAttributes?.data_retorno;
 
+    // ===== PROCESSAR ASSIGNEE (RESPONSÁVEL) =====
+    const assignee: ChatwootAssignee | undefined = payload.conversation?.assignee || payload.assignee;
+    let assignedToUserId: string | null = null;
+    
+    if (assignee?.id) {
+      console.log('[webhook-dispatcher] Assignee encontrado:', {
+        id: assignee.id,
+        name: assignee.name,
+        email: assignee.email
+      });
+      
+      // Buscar usuário CRM que tem este chatwoot_agent_id
+      const { data: crmUser, error: crmUserError } = await supabase
+        .from('users_crm')
+        .select('id, nome, email')
+        .eq('chatwoot_agent_id', assignee.id)
+        .eq('ativo', true)
+        .maybeSingle();
+      
+      if (crmUserError) {
+        console.error('[webhook-dispatcher] Erro ao buscar usuário CRM:', crmUserError);
+      }
+      
+      if (crmUser) {
+        assignedToUserId = crmUser.id;
+        console.log('[webhook-dispatcher] Usuário CRM vinculado:', crmUser.nome || crmUser.email);
+      } else {
+        console.log('[webhook-dispatcher] Nenhum usuário CRM vinculado ao agente ID:', assignee.id);
+      }
+    }
+
     console.log('[webhook-dispatcher] Processando conversa:', conversationId, {
       nomeFunil,
       funilEtapa,
       dataRetorno,
-      allCustomAttributes: customAttributes,
+      assignee: assignee?.id,
+      assignedToUserId,
     });
 
     // Buscar card existente
@@ -140,22 +182,25 @@ Deno.serve(async (req) => {
         }
       }
 
-      console.log('[webhook-dispatcher] Atualizando card com:', {
-        funilId,
-        etapaId,
-        nomeFunil,
-        funilEtapa,
-      });
+      // Preparar objeto de atualização
+      const updateData: Record<string, any> = {
+        funil_nome: nomeFunil || existingCard.funil_nome,
+        funil_etapa: funilEtapa || existingCard.funil_etapa,
+        data_retorno: dataRetorno || existingCard.data_retorno,
+        funil_id: funilId,
+        etapa_id: etapaId,
+      };
+      
+      // Atualizar assigned_to se houver agente vinculado
+      if (assignedToUserId) {
+        updateData.assigned_to = assignedToUserId;
+      }
+
+      console.log('[webhook-dispatcher] Atualizando card com:', updateData);
 
       const { error: updateError } = await supabase
         .from('cards_conversas')
-        .update({
-          funil_nome: nomeFunil || existingCard.funil_nome,
-          funil_etapa: funilEtapa || existingCard.funil_etapa,
-          data_retorno: dataRetorno || existingCard.data_retorno,
-          funil_id: funilId,
-          etapa_id: etapaId,
-        })
+        .update(updateData)
         .eq('id', existingCard.id);
 
       if (updateError) {
@@ -220,17 +265,25 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Preparar objeto de inserção
+      const insertData: Record<string, any> = {
+        chatwoot_conversa_id: conversationId,
+        titulo: `Conversa Chatwoot #${conversationId}`,
+        funil_nome: nomeFunil || defaultFunil?.nome || 'Sem Funil',
+        funil_etapa: funilEtapa || 'Primeira Etapa',
+        data_retorno: dataRetornoPadrao,
+        funil_id: funilId,
+        etapa_id: etapaId,
+      };
+      
+      // Adicionar assigned_to se houver agente vinculado
+      if (assignedToUserId) {
+        insertData.assigned_to = assignedToUserId;
+      }
+
       const { data: newCard, error: insertError } = await supabase
         .from('cards_conversas')
-        .insert({
-          chatwoot_conversa_id: conversationId,
-          titulo: `Conversa Chatwoot #${conversationId}`,
-          funil_nome: nomeFunil || defaultFunil?.nome || 'Sem Funil',
-          funil_etapa: funilEtapa || 'Primeira Etapa',
-          data_retorno: dataRetornoPadrao,
-          funil_id: funilId,
-          etapa_id: etapaId,
-        })
+        .insert(insertData)
         .select()
         .single();
 
