@@ -7,6 +7,7 @@ import { AbaMappings } from "@/components/AbaMappings";
 import { AbaUsuarios } from "@/components/AbaUsuarios";
 import { AbaMonitoramento } from "@/components/AbaMonitoramento";
 import { AbaConfigIA } from "@/components/AbaConfigIA";
+import { AbaLeadScore } from "@/components/AbaLeadScore";
 import { AbaProdutos } from "@/components/AbaProdutos";
 import { AbaMotivosPerda } from "@/components/AbaMotivosPerda";
 import { AbaKanbanColors } from "@/components/AbaKanbanColors";
@@ -33,7 +34,8 @@ import {
   UserCircle,
   Code,
   Key,
-  Zap
+  Zap,
+  Flame
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -74,6 +76,7 @@ const fullMenuCategories: MenuCategory[] = [
     items: [
       { id: "monitoramento", label: "Monitoramento", icon: Activity },
       { id: "automacoes", label: "Automações", icon: Zap },
+      { id: "lead-score", label: "Lead Score", icon: Flame },
       { id: "ia", label: "Inteligência Artificial", icon: Bot },
     ],
     adminOnly: true
@@ -159,6 +162,7 @@ const Configuracoes = () => {
       case "mappings": return <AbaMappings />;
       case "monitoramento": return <AbaMonitoramento />;
       case "automacoes": return <AbaAutomacoes />;
+      case "lead-score": return <AbaLeadScore />;
       case "ia": return <AbaConfigIA />;
       case "funis": return <AbaFunis />;
       case "produtos": return <AbaProdutos />;
