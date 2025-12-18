@@ -5,6 +5,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Interface para o assignee (agente responsável)
+interface ChatwootAssignee {
+  id: number;
+  name: string;
+  email?: string;
+  avatar_url?: string;
+}
+
 interface ChatwootWebhookPayload {
   event: string;
   // Formato nested: payload.conversation.*
@@ -26,7 +34,9 @@ interface ChatwootWebhookPayload {
         phone_number?: string;
       };
       channel: string;
+      assignee?: ChatwootAssignee;
     };
+    assignee?: ChatwootAssignee;
     labels?: string[];
   };
   // Formato flat: payload.id/messages/meta diretamente
@@ -47,7 +57,9 @@ interface ChatwootWebhookPayload {
       phone_number?: string;
     };
     channel: string;
+    assignee?: ChatwootAssignee;
   };
+  assignee?: ChatwootAssignee;
   labels?: string[];
   // Label adicionada/removida
   label?: {
@@ -212,17 +224,65 @@ Deno.serve(async (req) => {
     const defaultEtapaId = etapas[0].id;
     console.log('[chatwoot-webhook] Etapa padrão:', defaultEtapaId);
 
+    // ===== PROCESSAR ASSIGNEE (RESPONSÁVEL) =====
+    // O assignee pode estar em diferentes locais dependendo do formato
+    const assignee: ChatwootAssignee | undefined = 
+      conversation.assignee || 
+      conversation.meta?.assignee || 
+      payload.assignee;
+    
+    let assignedToUserId: string | null = null;
+    
+    if (assignee?.id) {
+      console.log('[chatwoot-webhook] Assignee encontrado:', {
+        id: assignee.id,
+        name: assignee.name,
+        email: assignee.email
+      });
+      
+      // Buscar usuário CRM que tem este chatwoot_agent_id
+      const { data: crmUser, error: crmUserError } = await supabaseClient
+        .from('users_crm')
+        .select('id, nome, email, avatar_url')
+        .eq('chatwoot_agent_id', assignee.id)
+        .eq('ativo', true)
+        .single();
+      
+      if (crmUserError && crmUserError.code !== 'PGRST116') {
+        console.error('[chatwoot-webhook] Erro ao buscar usuário CRM:', crmUserError);
+      }
+      
+      if (crmUser) {
+        assignedToUserId = crmUser.id;
+        console.log('[chatwoot-webhook] Usuário CRM encontrado:', {
+          id: crmUser.id,
+          nome: crmUser.nome,
+          email: crmUser.email
+        });
+      } else {
+        console.log('[chatwoot-webhook] Nenhum usuário CRM vinculado ao agente Chatwoot ID:', assignee.id);
+      }
+    } else {
+      console.log('[chatwoot-webhook] Sem assignee na conversa');
+    }
+
     // Preparar dados do card
     const lastMessage = conversation.messages?.[conversation.messages.length - 1];
     const contactName = conversation.meta.sender.name || 'Sem nome';
 
-    const cardData = {
+    const cardData: Record<string, any> = {
       chatwoot_conversa_id: conversation.id,
       titulo: `${contactName} - ${conversation.meta.channel}`,
       resumo: lastMessage?.content || 'Sem mensagens',
       etapa_id: defaultEtapaId,
       updated_at: new Date().toISOString(),
     };
+    
+    // Adicionar assigned_to se encontrou usuário CRM vinculado
+    if (assignedToUserId) {
+      cardData.assigned_to = assignedToUserId;
+      console.log('[chatwoot-webhook] Card será atribuído ao usuário:', assignedToUserId);
+    }
 
     console.log('[chatwoot-webhook] === PREPARANDO UPSERT ===');
     console.log('[chatwoot-webhook] Card data:', JSON.stringify(cardData, null, 2));
