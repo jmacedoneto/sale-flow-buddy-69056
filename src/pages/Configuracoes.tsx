@@ -14,6 +14,7 @@ import { AbaFunis } from "@/components/AbaFunis";
 import { AbaPerfilUsuario } from "@/components/AbaPerfilUsuario";
 import { AbaAlterarSenha } from "@/components/AbaAlterarSenha";
 import { AbaApiDocs } from "@/components/AbaApiDocs";
+import { AbaAutomacoes } from "@/components/AbaAutomacoes";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Skeleton } from "@/components/ui/skeleton";
 import { 
@@ -31,7 +32,8 @@ import {
   Settings,
   UserCircle,
   Code,
-  Key
+  Key,
+  Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -71,6 +73,7 @@ const fullMenuCategories: MenuCategory[] = [
     title: "Sistema",
     items: [
       { id: "monitoramento", label: "Monitoramento", icon: Activity },
+      { id: "automacoes", label: "Automações", icon: Zap },
       { id: "ia", label: "Inteligência Artificial", icon: Bot },
     ],
     adminOnly: true
@@ -155,6 +158,7 @@ const Configuracoes = () => {
       case "externos": return <AbaWebhooksExternos />;
       case "mappings": return <AbaMappings />;
       case "monitoramento": return <AbaMonitoramento />;
+      case "automacoes": return <AbaAutomacoes />;
       case "ia": return <AbaConfigIA />;
       case "funis": return <AbaFunis />;
       case "produtos": return <AbaProdutos />;

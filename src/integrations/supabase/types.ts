@@ -174,6 +174,42 @@ export type Database = {
           },
         ]
       }
+      automacoes_config: {
+        Row: {
+          acao: Json
+          ativo: boolean | null
+          created_at: string | null
+          descricao: string | null
+          gatilho: Json
+          id: string
+          nome: string
+          tipo: string
+          updated_at: string | null
+        }
+        Insert: {
+          acao: Json
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          gatilho: Json
+          id?: string
+          nome: string
+          tipo: string
+          updated_at?: string | null
+        }
+        Update: {
+          acao?: Json
+          ativo?: boolean | null
+          created_at?: string | null
+          descricao?: string | null
+          gatilho?: Json
+          id?: string
+          nome?: string
+          tipo?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       card_produtos: {
         Row: {
           card_id: string
