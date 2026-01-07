@@ -1118,6 +1118,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calcular_dias_uteis: {
+        Args: { data_base: string; n_dias?: number }
+        Returns: string
+      }
       can_access_funil: {
         Args: { _funil_id: string; _require_edit?: boolean; _user_id: string }
         Returns: boolean

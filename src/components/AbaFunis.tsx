@@ -191,7 +191,7 @@ export const AbaFunis = () => {
               <br />
               <br />
               <strong className="text-destructive">
-                Não é possível excluir funis que contenham cards ativos.
+                Não é possível excluir funis que contenham cards (ativos, ganhos ou perdidos).
               </strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
