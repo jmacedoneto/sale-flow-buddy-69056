@@ -8,9 +8,10 @@ export const useDeleteFunil = () => {
   return useMutation({
     mutationFn: async (funilId: string) => {
       // Verificar se existem QUAISQUER cards no funil (ativos, ganhos ou perdidos)
+      // Usando query direta sem join para evitar erro PGRST201 de ambiguidade
       const { count, error: countError } = await supabase
         .from('cards_conversas')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('funil_id', funilId);
 
       if (countError) throw countError;
