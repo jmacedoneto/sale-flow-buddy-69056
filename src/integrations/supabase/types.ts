@@ -1123,6 +1123,10 @@ export type Database = {
         Returns: boolean
       }
       get_user_role: { Args: { _user_email: string }; Returns: string }
+      has_crm_role: {
+        Args: { _role: string; _user_id: string }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
