@@ -28,7 +28,13 @@ export const useDeleteFunil = () => {
         .delete()
         .eq('id', funilId);
 
-      if (deleteError) throw deleteError;
+      if (deleteError) {
+        // RLS pode bloquear a exclusão se o usuário não for admin
+        if (deleteError.code === '42501' || deleteError.message?.includes('policy')) {
+          throw new Error('Você não tem permissão para excluir funis. Apenas administradores podem fazer isso.');
+        }
+        throw deleteError;
+      }
     },
     onSuccess: () => {
       toast.success('Funil excluído com sucesso');
