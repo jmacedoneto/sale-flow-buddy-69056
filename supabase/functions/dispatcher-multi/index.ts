@@ -671,6 +671,30 @@ Deno.serve(async (req) => {
         });
       }
 
+      // Sincronizar data_prevista de atividades pendentes se data_followup mudou
+      if (dataFollowup && cardId) {
+        let dataPrevistaAtualizada: string | null = null;
+        try {
+          const parsedDate = new Date(dataFollowup);
+          if (!isNaN(parsedDate.getTime())) {
+            dataPrevistaAtualizada = parsedDate.toISOString().split('T')[0];
+          }
+        } catch (e) {}
+        
+        if (dataPrevistaAtualizada) {
+          const { error: updateError, count } = await supabase
+            .from('atividades_cards')
+            .update({ data_prevista: dataPrevistaAtualizada })
+            .eq('card_id', cardId)
+            .eq('status', 'pendente')
+            .in('tipo', ['FOLLOW_UP', 'NOTA_CHATWOOT', 'FOLLOWUP_CHATWOOT']);
+          
+          if (!updateError) {
+            console.log(`[conversation_updated] Atividades atualizadas com nova data_prevista: ${dataPrevistaAtualizada}`);
+          }
+        }
+      }
+
       await supabase.from('webhook_sync_logs').insert({
         sync_type: 'chatwoot_to_lovable',
         conversation_id: conversationId,
@@ -937,38 +961,86 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ========== HANDLER: note_created (Atividades Avulsas) ==========
+    // ========== HANDLER: note_created (Atividades Comerciais/Administrativas) ==========
     if (eventType === 'note_created' || eventType === 'contact_note_created') {
       const noteContent = payload?.content || payload?.note?.content || payload?.body || '';
       const contactId = payload?.contact_id || payload?.contact?.id;
       
-      console.log(`[note_created] Criando atividade avulsa. ContactId: ${contactId}, Content: ${noteContent?.substring(0, 100)}`);
+      console.log(`[note_created] Criando atividade. ContactId: ${contactId}, Content: ${noteContent?.substring(0, 100)}`);
       
-      // Buscar card existente para este contato (se houver)
+      // Buscar card existente COM funil_id
       let linkedCardId: string | null = null;
+      let cardFunilId: string | null = null;
       
       if (conversationId) {
         const { data: existingCard } = await supabase
           .from('cards_conversas')
-          .select('id')
+          .select('id, funil_id')
           .eq('chatwoot_conversa_id', conversationId)
           .maybeSingle();
         
         if (existingCard) {
           linkedCardId = existingCard.id;
+          cardFunilId = existingCard.funil_id;
         }
       }
       
-      // Criar atividade (card_id pode ser null para atividades avulsas)
+      // ID do Funil Comercial
+      const FUNIL_COMERCIAL_ID = '0e9000e5-9ee0-451c-9539-36af95f8080f';
+      const isComercial = cardFunilId === FUNIL_COMERCIAL_ID;
+      
+      // Buscar data_followup dos custom_attributes
+      const dataFollowup = mergedAttrs?.data_followup || custom_attrs?.data_followup;
+      
+      let dataPrevista: string | null = null;
+      let tipoAtividade = 'NOTA_ADMIN';
+      
+      if (isComercial) {
+        tipoAtividade = 'FOLLOW_UP';
+        
+        if (dataFollowup) {
+          // Usar data do custom attribute
+          try {
+            const parsedDate = new Date(dataFollowup);
+            if (!isNaN(parsedDate.getTime())) {
+              dataPrevista = parsedDate.toISOString().split('T')[0];
+            }
+          } catch (e) {
+            console.warn('[note_created] Erro ao parsear data_followup:', e);
+          }
+        }
+        
+        if (!dataPrevista) {
+          // Calcular 3 dias úteis à frente usando função do banco
+          const { data: resultado } = await supabase
+            .rpc('calcular_dias_uteis', { data_base: new Date().toISOString().split('T')[0], n_dias: 3 });
+          
+          if (resultado) {
+            dataPrevista = resultado;
+          } else {
+            // Fallback: 3 dias corridos se a função falhar
+            const fallback = new Date();
+            fallback.setDate(fallback.getDate() + 3);
+            dataPrevista = fallback.toISOString().split('T')[0];
+          }
+        }
+        
+        console.log(`[note_created] Atividade COMERCIAL: data_prevista=${dataPrevista}`);
+      } else {
+        console.log(`[note_created] Atividade ADMINISTRATIVA (funil: ${cardFunilId})`);
+      }
+      
+      // Criar atividade
       const { data: atividade, error: atividadeError } = await supabase
         .from('atividades_cards')
         .insert({
-          card_id: linkedCardId, // Pode ser null
+          card_id: linkedCardId,
           chatwoot_contact_id: contactId,
-          tipo: 'NOTA_CHATWOOT',
+          tipo: tipoAtividade,
           descricao: noteContent || 'Nota do Chatwoot',
+          data_prevista: dataPrevista,
           status: 'pendente',
-          privado: true,
+          privado: !isComercial, // Comercial: visível para todos; Admin: privado
         })
         .select('id')
         .single();
@@ -997,13 +1069,26 @@ Deno.serve(async (req) => {
         conversation_id: conversationId,
         card_id: linkedCardId,
         status: 'success',
-        event_type: 'note_created_activity',
+        event_type: isComercial ? 'note_comercial_created' : 'note_admin_created',
         latency_ms: Date.now() - startTime,
-        payload: { atividadeId: atividade.id, contactId, hasLinkedCard: !!linkedCardId }
+        payload: { 
+          atividadeId: atividade.id, 
+          contactId, 
+          hasLinkedCard: !!linkedCardId,
+          isComercial,
+          dataPrevista,
+          tipoAtividade
+        }
       });
       
       return new Response(
-        JSON.stringify({ success: true, message: 'Note activity created', atividade_id: atividade.id }),
+        JSON.stringify({ 
+          success: true, 
+          message: `${isComercial ? 'Commercial' : 'Admin'} note activity created`, 
+          atividade_id: atividade.id,
+          tipo: tipoAtividade,
+          data_prevista: dataPrevista
+        }),
         { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

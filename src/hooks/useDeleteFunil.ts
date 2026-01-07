@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -7,21 +7,22 @@ export const useDeleteFunil = () => {
 
   return useMutation({
     mutationFn: async (funilId: string) => {
-      // Verificar se existem cards ativos no funil
+      // Verificar se existem QUAISQUER cards no funil (ativos, ganhos ou perdidos)
       const { count, error: countError } = await supabase
         .from('cards_conversas')
         .select('id', { count: 'exact', head: true })
-        .eq('funil_id', funilId)
-        .neq('status', 'ganho')
-        .neq('status', 'perdido');
+        .eq('funil_id', funilId);
 
       if (countError) throw countError;
 
       if (count && count > 0) {
-        throw new Error(`Não é possível excluir um funil que contém ${count} card(s) ativo(s). Mova ou finalize os cards primeiro.`);
+        throw new Error(
+          `Não é possível excluir um funil que contém ${count} card(s). ` +
+          `Para excluir, primeiro mova ou exclua todos os cards (incluindo ganhos e perdidos).`
+        );
       }
 
-      // Deletar funil
+      // Deletar funil (CASCADE já cuida das etapas)
       const { error: deleteError } = await supabase
         .from('funis')
         .delete()
