@@ -147,12 +147,18 @@ export const AtividadesLista = ({ filters, searchTerm, mostrarConcluidas, isAdmi
     
     setIsDeleting(true);
     try {
-      const { error } = await supabase
-        .from('atividades_cards')
-        .delete()
-        .in('id', Array.from(selectedIds));
+      const idsArray = Array.from(selectedIds);
+      const batchSize = 50; // Deletar em lotes de 50 para evitar URL muito longa
+      
+      for (let i = 0; i < idsArray.length; i += batchSize) {
+        const batch = idsArray.slice(i, i + batchSize);
+        const { error } = await supabase
+          .from('atividades_cards')
+          .delete()
+          .in('id', batch);
 
-      if (error) throw error;
+        if (error) throw error;
+      }
       
       toast.success(`${selectedIds.size} atividade(s) excluída(s)`);
       setSelectedIds(new Set());
