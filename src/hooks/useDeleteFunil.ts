@@ -44,7 +44,8 @@ export const useDeleteFunil = () => {
     },
     onError: (error: any) => {
       console.error('Erro ao excluir funil:', error);
-      toast.error(error.message || 'Erro ao excluir funil');
+      const mensagem = error?.message || error?.details || 'Erro desconhecido ao excluir funil';
+      toast.error(mensagem);
     },
   });
 };
