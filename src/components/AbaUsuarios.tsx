@@ -23,6 +23,7 @@ interface PermissionValues {
   edit_etapas: boolean;
   ver_relatorios: boolean;
   gerenciar_usuarios: boolean;
+  ver_cards_outros: boolean;
 }
 
 export const AbaUsuarios = () => {
@@ -319,6 +320,7 @@ export const AbaUsuarios = () => {
                                   edit_etapas: user.edit_etapas ?? false,
                                   ver_relatorios: user.ver_relatorios ?? false,
                                   gerenciar_usuarios: user.gerenciar_usuarios ?? false,
+                                  ver_cards_outros: user.ver_cards_outros ?? false,
                                 }
                               });
                               setPermissionsModalOpen(true);
