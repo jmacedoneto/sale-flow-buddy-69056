@@ -1126,6 +1126,7 @@ export type Database = {
         Args: { _funil_id: string; _require_edit?: boolean; _user_id: string }
         Returns: boolean
       }
+      count_cards_by_funil: { Args: { p_funil_id: string }; Returns: number }
       get_user_role: { Args: { _user_email: string }; Returns: string }
       has_crm_role: {
         Args: { _role: string; _user_id: string }
