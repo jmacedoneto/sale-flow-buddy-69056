@@ -7,14 +7,14 @@ export const useDeleteFunil = () => {
 
   return useMutation({
     mutationFn: async (funilId: string) => {
-      // Verificar se existem QUAISQUER cards no funil (ativos, ganhos ou perdidos)
-      // Usando query direta sem join para evitar erro PGRST201 de ambiguidade
-      const { count, error: countError } = await supabase
-        .from('cards_conversas')
-        .select('*', { count: 'exact', head: true })
-        .eq('funil_id', funilId);
+      // Usar RPC para evitar erro PGRST201 de ambiguidade nas foreign keys
+      const { data: count, error: countError } = await supabase
+        .rpc('count_cards_by_funil', { p_funil_id: funilId });
 
-      if (countError) throw countError;
+      if (countError) {
+        console.error('Erro ao contar cards:', countError);
+        throw new Error('Erro ao verificar cards do funil');
+      }
 
       if (count && count > 0) {
         throw new Error(
