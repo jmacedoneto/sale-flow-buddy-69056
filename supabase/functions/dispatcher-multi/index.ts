@@ -354,6 +354,14 @@ Deno.serve(async (req) => {
       || payload?.message_type 
       || 'unknown';
     
+    // Normalizar eventos de automação do Chatwoot
+    // automation_event.message_created → message_created
+    if (eventType.startsWith('automation_event.')) {
+      const originalEventType = eventType;
+      eventType = eventType.replace('automation_event.', '');
+      console.log(`[dispatcher-multi] Evento de automação normalizado: ${originalEventType} → ${eventType}`);
+    }
+    
     console.log(`[dispatcher-multi] Event type: ${eventType}`);
 
     // ========== GHOST-GUARD INTELIGENTE ==========
