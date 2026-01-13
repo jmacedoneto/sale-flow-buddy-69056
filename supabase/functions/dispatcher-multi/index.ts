@@ -932,6 +932,115 @@ Deno.serve(async (req) => {
           .update(updateData)
           .eq('id', cardExists.id);
 
+        // === SINCRONIZAÇÃO DE MENSAGENS PRIVADAS VIA API ===
+        // Como o Chatwoot não envia webhooks para mensagens privadas via automação,
+        // buscamos diretamente da API do Chatwoot quando recebemos qualquer mensagem
+        console.log(`[dispatcher-multi] Buscando mensagens privadas da API do Chatwoot para conversa ${conversationId}`);
+        
+        try {
+          // Buscar configuração do Chatwoot
+          const { data: chatwootConfig } = await supabase
+            .from('integracao_chatwoot')
+            .select('url, api_key, account_id')
+            .single();
+          
+          if (chatwootConfig?.api_key && chatwootConfig?.url && chatwootConfig?.account_id) {
+            const messagesUrl = `${chatwootConfig.url}/api/v1/accounts/${chatwootConfig.account_id}/conversations/${conversationId}/messages`;
+            
+            const messagesResponse = await fetch(messagesUrl, {
+              method: 'GET',
+              headers: {
+                'api_access_token': chatwootConfig.api_key,
+                'Content-Type': 'application/json',
+              },
+            });
+            
+            if (messagesResponse.ok) {
+              const messagesData = await messagesResponse.json();
+              const allMessages = messagesData.payload || messagesData || [];
+              
+              // Filtrar mensagens privadas
+              const privateMessages = allMessages.filter((msg: any) => msg.private === true);
+              
+              if (privateMessages.length > 0) {
+                console.log(`[dispatcher-multi] Encontradas ${privateMessages.length} mensagens privadas`);
+                
+                // Buscar IDs de mensagens já sincronizadas
+                const { data: existingActivities } = await supabase
+                  .from('atividades_cards')
+                  .select('chatwoot_message_id')
+                  .eq('card_id', cardExists.id)
+                  .not('chatwoot_message_id', 'is', null);
+                
+                const syncedIds = new Set((existingActivities || []).map(a => a.chatwoot_message_id));
+                
+                // Filtrar apenas não sincronizadas
+                const newPrivateMessages = privateMessages.filter((msg: any) => !syncedIds.has(msg.id));
+                
+                if (newPrivateMessages.length > 0) {
+                  console.log(`[dispatcher-multi] Sincronizando ${newPrivateMessages.length} novas mensagens privadas`);
+                  
+                  // Buscar funil do card
+                  const { data: cardFunil } = await supabase
+                    .from('cards_conversas')
+                    .select('funil_nome')
+                    .eq('id', cardExists.id)
+                    .single();
+                  
+                  const isComercial = cardFunil?.funil_nome?.toLowerCase().includes('comercial');
+                  
+                  // Calcular data prevista se for comercial
+                  let dataPrevista: string | null = null;
+                  if (isComercial) {
+                    const { data: resultado } = await supabase.rpc('calcular_dias_uteis', {
+                      data_base: new Date().toISOString().split('T')[0],
+                      n_dias: 3
+                    });
+                    dataPrevista = resultado;
+                  }
+                  
+                  // Criar atividades
+                  const atividades = newPrivateMessages.map((msg: any) => ({
+                    card_id: cardExists.id,
+                    tipo: isComercial ? 'FOLLOW_UP' : 'NOTA_ADMIN',
+                    descricao: msg.content || '[Mensagem sem conteúdo]',
+                    privado: !isComercial,
+                    data_prevista: isComercial ? dataPrevista : null,
+                    chatwoot_message_id: msg.id,
+                    status: 'pendente',
+                  }));
+                  
+                  const { error: insertError } = await supabase
+                    .from('atividades_cards')
+                    .insert(atividades);
+                  
+                  if (!insertError) {
+                    console.log(`[dispatcher-multi] Criadas ${atividades.length} atividades de mensagens privadas`);
+                    
+                    await supabase.from('webhook_sync_logs').insert({
+                      sync_type: 'private_message_api_sync',
+                      conversation_id: conversationId,
+                      card_id: cardExists.id,
+                      status: 'success',
+                      event_type: isComercial ? 'follow_up_from_private' : 'nota_admin_from_private',
+                      latency_ms: Date.now() - startTime,
+                      payload: { 
+                        synced_count: atividades.length, 
+                        tipo: isComercial ? 'FOLLOW_UP' : 'NOTA_ADMIN',
+                        message_ids: newPrivateMessages.map((m: any) => m.id)
+                      }
+                    });
+                  } else {
+                    console.error(`[dispatcher-multi] Erro ao criar atividades:`, insertError);
+                  }
+                }
+              }
+            }
+          }
+        } catch (syncError) {
+          console.error(`[dispatcher-multi] Erro ao sincronizar mensagens privadas:`, syncError);
+        }
+
         await supabase.from('webhook_sync_logs').insert({
           sync_type: 'chatwoot_to_lovable',
           conversation_id: conversationId,
