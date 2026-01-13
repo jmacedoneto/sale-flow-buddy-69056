@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Loader2, MessageCircle, User, Image as ImageIcon, FileText, Volume2 } from "lucide-react";
+import { Send, Loader2, MessageCircle, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
 import { useChatwootMessages } from "@/hooks/useChatwootMessages";
 import { sendChatwootMessage } from "@/services/chatwootMessagingService";
 import { usePermissions } from "@/hooks/usePermissions";
@@ -207,24 +208,43 @@ const MessageBubble = ({
   avatarAgenteUrl?: string | null;
 }) => {
   const isAgent = message.message_type === 1; // 1 = outgoing (agent)
+  const isPrivate = message.private === true; // Mensagem privada
   const timestamp = new Date(message.created_at * 1000);
   const senderName = message.sender?.name || (isAgent ? "Agente" : "Cliente");
   const avatarUrl = isAgent ? avatarAgenteUrl : avatarLeadUrl;
   const initials = senderName.substring(0, 2).toUpperCase();
 
+  // Definir estilos baseado no tipo de mensagem
+  const getBubbleStyles = () => {
+    if (isPrivate) {
+      // Mensagem privada: fundo amarelo/âmbar (como no Chatwoot)
+      return "bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-100 border border-amber-300 dark:border-amber-700 rounded-tr-sm";
+    }
+    if (isAgent) {
+      return "bg-primary text-primary-foreground rounded-tr-sm";
+    }
+    return "bg-muted text-foreground rounded-tl-sm";
+  };
+
   return (
     <div className={`flex gap-3 ${isAgent ? "flex-row-reverse" : "flex-row"} animate-fade-in`}>
       {/* Avatar */}
       <Avatar className={`flex-shrink-0 w-10 h-10 shadow-sm ${
-        isAgent ? "ring-2 ring-primary/20" : "ring-2 ring-muted/50"
+        isPrivate 
+          ? "ring-2 ring-amber-400/50" 
+          : isAgent 
+            ? "ring-2 ring-primary/20" 
+            : "ring-2 ring-muted/50"
       }`}>
         {avatarUrl ? (
           <AvatarImage src={avatarUrl} alt={senderName} />
         ) : null}
         <AvatarFallback className={`${
-          isAgent
-            ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
-            : "bg-gradient-to-br from-muted to-muted/80 text-foreground"
+          isPrivate
+            ? "bg-gradient-to-br from-amber-400 to-amber-500 text-amber-900"
+            : isAgent
+              ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground"
+              : "bg-gradient-to-br from-muted to-muted/80 text-foreground"
         }`}>
           {initials}
         </AvatarFallback>
@@ -232,20 +252,20 @@ const MessageBubble = ({
 
       {/* Conteúdo */}
       <div className={`flex-1 max-w-[75%] ${isAgent ? "text-right" : "text-left"}`}>
-        <div className={`flex items-baseline gap-2 mb-1 ${isAgent ? "justify-end" : "justify-start"}`}>
+        <div className={`flex items-center gap-2 mb-1 ${isAgent ? "justify-end" : "justify-start"}`}>
           <span className="text-sm font-medium text-foreground">{senderName}</span>
+          {isPrivate && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-600">
+              <Lock className="h-2.5 w-2.5 mr-0.5" />
+              Privada
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground">
             {format(timestamp, "dd/MM 'às' HH:mm", { locale: ptBR })}
           </span>
         </div>
 
-        <div
-          className={`inline-block px-4 py-2.5 rounded-2xl shadow-sm ${
-            isAgent
-              ? "bg-primary text-primary-foreground rounded-tr-sm"
-              : "bg-muted text-foreground rounded-tl-sm"
-          }`}
-        >
+        <div className={`inline-block px-4 py-2.5 rounded-2xl shadow-sm ${getBubbleStyles()}`}>
           <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">
             {message.content}
           </p>

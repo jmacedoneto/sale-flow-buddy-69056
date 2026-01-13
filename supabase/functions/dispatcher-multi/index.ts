@@ -356,7 +356,7 @@ Deno.serve(async (req) => {
     
     // Normalizar eventos de automação do Chatwoot
     // automation_event.message_created → message_created
-    if (eventType.startsWith('automation_event.')) {
+    if (eventType && eventType.startsWith('automation_event.')) {
       const originalEventType = eventType;
       eventType = eventType.replace('automation_event.', '');
       console.log(`[dispatcher-multi] Evento de automação normalizado: ${originalEventType} → ${eventType}`);
@@ -855,13 +855,23 @@ Deno.serve(async (req) => {
       if (cardExists && messageId) {
         // Processar mensagem privada como atividade
         if (isPrivate) {
-          // Determinar tipo de atividade baseado na etiqueta
-          const isComercialLabel = labels.includes('funil_comercial');
+          // Buscar funil do card para determinar tipo de atividade
+          const { data: cardFunil } = await supabase
+            .from('cards_conversas')
+            .select('funil_id, funil_nome')
+            .eq('id', cardExists.id)
+            .single();
+
+          // Determinar se é funil Comercial (por nome ou ID conhecido)
+          const isComercial = cardFunil?.funil_nome === 'Comercial' 
+            || cardFunil?.funil_id === '0e9000e5-9ee0-451c-9539-36af95f8080f';
+          
+          console.log(`[dispatcher-multi] Card funil: ${cardFunil?.funil_nome} (${cardFunil?.funil_id}), isComercial: ${isComercial}`);
           
           let tipoAtividade = 'NOTA_ADMIN';
           let dataPrevista: string | null = null;
           
-          if (isComercialLabel) {
+          if (isComercial) {
             tipoAtividade = 'FOLLOW_UP';
             // Calcular 3 dias úteis usando função do banco
             const { data: resultado } = await supabase
@@ -879,7 +889,7 @@ Deno.serve(async (req) => {
             chatwoot_message_id: messageId,
             data_prevista: dataPrevista,
             status: 'pendente',
-            privado: !isComercialLabel, // Comercial: visível; Outros: privado
+            privado: !isComercial, // Comercial: visível; Outros: privado
           });
 
           await supabase.from('webhook_sync_logs').insert({
@@ -887,9 +897,9 @@ Deno.serve(async (req) => {
             conversation_id: conversationId,
             card_id: cardExists.id,
             status: 'success',
-            event_type: isComercialLabel ? 'private_msg_comercial' : 'private_msg_admin',
+            event_type: isComercial ? 'private_msg_comercial' : 'private_msg_admin',
             latency_ms: Date.now() - startTime,
-            payload: { ...rawPayload, tipoAtividade, dataPrevista, isComercialLabel },
+            payload: { ...rawPayload, tipoAtividade, dataPrevista, isComercial, funil: cardFunil },
           });
 
           return new Response(
@@ -898,7 +908,8 @@ Deno.serve(async (req) => {
               message: `Private message processed as ${tipoAtividade}`, 
               card_id: cardExists.id,
               tipo: tipoAtividade,
-              data_prevista: dataPrevista
+              data_prevista: dataPrevista,
+              funil: cardFunil?.funil_nome
             }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
