@@ -366,8 +366,10 @@ Deno.serve(async (req) => {
 
     // ========== GHOST-GUARD INTELIGENTE ==========
     // Agora verificamos LABELS primeiro antes de bloquear mensagens privadas
-    const isPrivateMessage = payload?.private === true || payload?.message?.private === true;
-    const messageType = payload?.message_type || payload?.message?.message_type;
+    // O campo 'private' pode estar em: payload.private, payload.message.private, ou payload.messages[0].private
+    const firstMessage = payload?.messages?.[0];
+    const isPrivateMessage = payload?.private === true || payload?.message?.private === true || firstMessage?.private === true;
+    const messageType = payload?.message_type || payload?.message?.message_type || firstMessage?.message_type;
     
     // Para message_created/message_updated privada, verificar se tem labels mapeados ANTES de bloquear
     if ((eventType === 'message_created' || eventType === 'message_updated') && isPrivateMessage) {
@@ -780,9 +782,13 @@ Deno.serve(async (req) => {
 
     // ========== HANDLER: message_created / message_updated ==========
     if (eventType === 'message_created' || eventType === 'message_updated') {
-      const messageContent = payload.content || payload.message?.content || '';
-      const isPrivate = payload.private === true || payload.message?.private === true;
-      const messageId = payload.id || payload.message?.id;
+      // O campo 'private' pode estar em diferentes locais dependendo do formato do payload
+      const msgFromArray = payload?.messages?.[0];
+      const messageContent = payload.content || payload.message?.content || msgFromArray?.content || '';
+      const isPrivate = payload.private === true || payload.message?.private === true || msgFromArray?.private === true;
+      const messageId = payload.id || payload.message?.id || msgFromArray?.id;
+      
+      console.log(`[dispatcher-multi] Processando mensagem: isPrivate=${isPrivate}, messageId=${messageId}, content="${messageContent?.substring(0, 50)}..."`);
       
       let { data: cardExists } = await supabase
         .from('cards_conversas')
