@@ -847,12 +847,31 @@ Deno.serve(async (req) => {
       if (cardExists && messageId) {
         // Processar mensagem privada como atividade
         if (isPrivate) {
+          // Determinar tipo de atividade baseado na etiqueta
+          const isComercialLabel = labels.includes('funil_comercial');
+          
+          let tipoAtividade = 'NOTA_ADMIN';
+          let dataPrevista: string | null = null;
+          
+          if (isComercialLabel) {
+            tipoAtividade = 'FOLLOW_UP';
+            // Calcular 3 dias úteis usando função do banco
+            const { data: resultado } = await supabase
+              .rpc('calcular_dias_uteis', { 
+                data_base: new Date().toISOString().split('T')[0], 
+                n_dias: 3 
+              });
+            dataPrevista = resultado || null;
+          }
+          
           await supabase.from('atividades_cards').insert({
             card_id: cardExists.id,
-            tipo: 'MENSAGEM_PRIVADA',
+            tipo: tipoAtividade,
             descricao: messageContent || 'Mensagem privada do Chatwoot',
             chatwoot_message_id: messageId,
-            privado: true
+            data_prevista: dataPrevista,
+            status: 'pendente',
+            privado: !isComercialLabel, // Comercial: visível; Outros: privado
           });
 
           await supabase.from('webhook_sync_logs').insert({
@@ -860,13 +879,19 @@ Deno.serve(async (req) => {
             conversation_id: conversationId,
             card_id: cardExists.id,
             status: 'success',
-            event_type: 'message_created_private',
+            event_type: isComercialLabel ? 'private_msg_comercial' : 'private_msg_admin',
             latency_ms: Date.now() - startTime,
-            payload: rawPayload,
+            payload: { ...rawPayload, tipoAtividade, dataPrevista, isComercialLabel },
           });
 
           return new Response(
-            JSON.stringify({ success: true, message: 'Private message processed', card_id: cardExists.id }),
+            JSON.stringify({ 
+              success: true, 
+              message: `Private message processed as ${tipoAtividade}`, 
+              card_id: cardExists.id,
+              tipo: tipoAtividade,
+              data_prevista: dataPrevista
+            }),
             { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
