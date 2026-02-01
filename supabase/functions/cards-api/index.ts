@@ -15,6 +15,27 @@ async function hashApiKey(key: string): Promise<string> {
   return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// Helper: adiciona N dias úteis a uma data
+function addBusinessDays(date: Date, days: number): string {
+  let result = new Date(date);
+  let added = 0;
+  while (added < days) {
+    result.setDate(result.getDate() + 1);
+    const dayOfWeek = result.getDay();
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      added++;
+    }
+  }
+  return result.toISOString().split('T')[0];
+}
+
+// Helper: adiciona N dias a uma data
+function addDays(date: Date, days: number): string {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result.toISOString().split('T')[0];
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -75,6 +96,225 @@ serve(async (req) => {
 
     // Handle actions
     switch (action) {
+      // ========== NOVAS ACTIONS PARA AGENTE IA ==========
+      
+      case 'getByConversation': {
+        const { conversationId } = body;
+        
+        if (!conversationId) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'conversationId is required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const { data: card, error } = await supabase
+          .from('cards_conversas')
+          .select('*')
+          .eq('chatwoot_conversa_id', conversationId)
+          .maybeSingle();
+
+        if (error) {
+          console.error('Error fetching card by conversation:', error);
+          return new Response(
+            JSON.stringify({ success: false, error: error.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        return new Response(
+          JSON.stringify({ success: true, card }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'createFromConversation': {
+        const { conversationId, titulo, telefone, avatarUrl, funilId, etapaId } = body;
+
+        if (!conversationId || !funilId || !etapaId) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'conversationId, funilId, and etapaId are required' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Verificar se já existe card para esta conversa
+        const { data: existing } = await supabase
+          .from('cards_conversas')
+          .select('id')
+          .eq('chatwoot_conversa_id', conversationId)
+          .maybeSingle();
+
+        if (existing) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Card já existe para esta conversa', cardId: existing.id }),
+            { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Buscar nomes do funil e etapa
+        const [funilRes, etapaRes] = await Promise.all([
+          supabase.from('funis').select('nome').eq('id', funilId).single(),
+          supabase.from('etapas').select('nome').eq('id', etapaId).single()
+        ]);
+
+        if (funilRes.error || etapaRes.error) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Funil ou etapa não encontrado' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Criar card
+        const { data: card, error: cardError } = await supabase
+          .from('cards_conversas')
+          .insert({
+            chatwoot_conversa_id: conversationId,
+            titulo: titulo || `Conversa #${conversationId}`,
+            telefone_lead: telefone || null,
+            avatar_lead_url: avatarUrl || null,
+            funil_id: funilId,
+            etapa_id: etapaId,
+            funil_nome: funilRes.data?.nome,
+            funil_etapa: etapaRes.data?.nome,
+            status: 'em_andamento',
+            data_retorno: addDays(new Date(), 7)
+          })
+          .select()
+          .single();
+
+        if (cardError) {
+          console.error('Error creating card:', cardError);
+          return new Response(
+            JSON.stringify({ success: false, error: cardError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Criar atividade de criação
+        await supabase.from('atividades_cards').insert({
+          card_id: card.id,
+          tipo: 'CRIACAO',
+          descricao: 'Card criado via API'
+        });
+
+        console.log(`Card created from conversation ${conversationId}: ${card.id}`);
+
+        return new Response(
+          JSON.stringify({ success: true, card }),
+          { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'createActivity': {
+        let { cardId, conversationId, tipo, descricao, dataPrevista, funilNome, userId } = body;
+
+        // Resolver cardId se necessário
+        let resolvedCardId = cardId;
+        if (!resolvedCardId && conversationId) {
+          const { data: cardData } = await supabase
+            .from('cards_conversas')
+            .select('id, funil_nome')
+            .eq('chatwoot_conversa_id', conversationId)
+            .single();
+          
+          if (cardData) {
+            resolvedCardId = cardData.id;
+            // Usar funil_nome do card se não informado
+            if (!funilNome) {
+              funilNome = cardData.funil_nome;
+            }
+          }
+        }
+
+        if (!resolvedCardId) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Card não encontrado. Informe cardId ou conversationId válido.' }),
+            { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Determinar tipo baseado no funil
+        const isComercial = funilNome?.toLowerCase().includes('comercial');
+        const activityType = tipo || (isComercial ? 'FOLLOW_UP' : 'NOTA_ADMIN');
+        const isPrivate = !isComercial;
+
+        // Calcular data prevista se comercial e não informada
+        let resolvedDataPrevista = dataPrevista;
+        if (isComercial && !dataPrevista) {
+          resolvedDataPrevista = addBusinessDays(new Date(), 3);
+        }
+
+        const { data: activity, error: activityError } = await supabase
+          .from('atividades_cards')
+          .insert({
+            card_id: resolvedCardId,
+            tipo: activityType,
+            descricao: descricao || `Atividade: ${activityType}`,
+            data_prevista: resolvedDataPrevista || null,
+            privado: isPrivate,
+            status: 'pendente',
+            user_id: userId || null
+          })
+          .select()
+          .single();
+
+        if (activityError) {
+          console.error('Error creating activity:', activityError);
+          return new Response(
+            JSON.stringify({ success: false, error: activityError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Atualizar data_retorno do card se comercial
+        if (isComercial && resolvedDataPrevista) {
+          await supabase
+            .from('cards_conversas')
+            .update({ data_retorno: resolvedDataPrevista })
+            .eq('id', resolvedCardId);
+        }
+
+        console.log(`Activity created for card ${resolvedCardId}: ${activity.id}`);
+
+        return new Response(
+          JSON.stringify({ success: true, activity }),
+          { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      case 'listFunnels': {
+        const { data: funis, error: funisError } = await supabase
+          .from('funis')
+          .select('id, nome')
+          .order('created_at');
+
+        if (funisError) {
+          console.error('Error listing funnels:', funisError);
+          return new Response(
+            JSON.stringify({ success: false, error: funisError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        // Buscar etapas para cada funil
+        const funisWithEtapas = await Promise.all((funis || []).map(async (funil) => {
+          const { data: etapas } = await supabase
+            .from('etapas')
+            .select('id, nome, ordem, cor')
+            .eq('funil_id', funil.id)
+            .order('ordem');
+          return { ...funil, etapas: etapas || [] };
+        }));
+
+        return new Response(
+          JSON.stringify({ success: true, funnels: funisWithEtapas }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // ========== ACTIONS EXISTENTES ==========
+
       case 'move': {
         const { cardId, newStageId, funilId } = body;
 
@@ -268,7 +508,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: 'Invalid action. Available: move, list, get, create, update' 
+            error: 'Invalid action. Available: move, list, get, create, update, getByConversation, createFromConversation, createActivity, listFunnels' 
           }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );

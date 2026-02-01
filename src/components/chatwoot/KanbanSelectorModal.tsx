@@ -91,6 +91,7 @@ export const KanbanSelectorModal = ({ isOpen, onClose }: KanbanSelectorModalProp
           funilNome: funil.nome,
           etapaNome: etapa.nome,
           telefone: contact?.phone,
+          avatarUrl: contact?.avatar_url,
         });
         cardId = newCard.id;
         toast.success(`Card criado em ${funil.nome} → ${etapa.nome}`);
