@@ -44,6 +44,7 @@ export interface Etapa {
   funil_id: string;
   nome: string;
   ordem: number;
+  cor?: string | null;
   created_at?: string;
   updated_at?: string;
 }
