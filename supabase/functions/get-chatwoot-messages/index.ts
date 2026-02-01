@@ -76,17 +76,16 @@ async function fetchConversationMessages(
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(`[get-chatwoot-messages] === ERRO NA API CHATWOOT ===`);
-      console.error(`[get-chatwoot-messages] Status: ${response.status}`);
-      console.error(`[get-chatwoot-messages] Response body: ${errorText}`);
+      console.warn(`[get-chatwoot-messages] API retornou ${response.status}: ${errorText}`);
       
-      // Mensagens de erro específicas por status
+      // Se conversa não existe, retornar array vazio (não é erro fatal)
       if (response.status === 404) {
-        throw new Error(`Conversa ${conversationId} não encontrada no Chatwoot. Verifique se o ID está correto e se a conversa existe na conta ${accountId}.`);
+        console.log(`[get-chatwoot-messages] Conversa ${conversationId} não encontrada - retornando array vazio`);
+        return [];
       } else if (response.status === 401) {
-        throw new Error(`API Key inválida. Verifique o valor de CHATWOOT_API_KEY. Response: ${errorText}`);
+        throw new Error(`API Key inválida. Verifique o valor de CHATWOOT_API_KEY.`);
       } else if (response.status === 403) {
-        throw new Error(`Acesso negado. Verifique se a API Key tem permissão para acessar esta conversa. Response: ${errorText}`);
+        throw new Error(`Acesso negado. Verifique permissões da API Key.`);
       } else {
         throw new Error(`Erro ao buscar mensagens (${response.status}): ${errorText}`);
       }
