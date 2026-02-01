@@ -7,27 +7,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info, Sparkles, Trophy, X, Pause, ExternalLink } from "lucide-react";
+import { CalendarIcon, Save, Plus, MessageSquare, Activity, Info, Sparkles, Trophy, X, Pause, ExternalLink, User, Check, Clock } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import type { CardConversa } from "@/types/database";
 import { useUpdateCard, useFunis, useEtapas } from "@/hooks/useFunis";
-import { useAtividades, useCreateAtividade } from "@/hooks/useAtividades";
+import { useAtividades, useCreateAtividade, useUpdateAtividade } from "@/hooks/useAtividades";
 import { useSyncCardFromChatwoot } from "@/hooks/useSyncCardFromChatwoot";
 import { useAutosave } from "@/hooks/useAutosave";
 import { AtividadeTimeline } from "./AtividadeTimeline";
+import { FollowUpSection } from "./FollowUpSection";
 import { ChatInbox } from "./chat/ChatInbox";
 import { toast } from "sonner";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { supabase } from "@/integrations/supabase/client";
 import { ModalMotivoPerda } from "./ModalMotivoPerda";
 import { CardProdutosManager } from "./CardProdutosManager";
 import { useChatwootConfig } from "@/hooks/useChatwootConfig";
 import { RefreshCw } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 interface CardDetailsModalProps {
   card: CardConversa | null;
@@ -56,10 +59,27 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
   const updateCard = useUpdateCard();
   const { atividades, loading: isLoadingAtividades } = useAtividades(card?.id || null);
   const createAtividade = useCreateAtividade();
+  const updateAtividade = useUpdateAtividade();
   const { data: funis } = useFunis();
   const { data: etapas } = useEtapas(funilId || null);
   const { config } = useChatwootConfig();
   const syncMutation = useSyncCardFromChatwoot();
+
+  // Buscar dados do responsável (assigned_to)
+  const { data: responsavel } = useQuery({
+    queryKey: ['responsavel', card?.assigned_to],
+    queryFn: async () => {
+      if (!card?.assigned_to) return null;
+      const { data, error } = await supabase
+        .from('users_crm')
+        .select('id, nome, email, avatar_url')
+        .eq('id', card.assigned_to)
+        .single();
+      if (error) return null;
+      return data;
+    },
+    enabled: !!card?.assigned_to,
+  });
 
   useEffect(() => {
     if (card) {
@@ -424,26 +444,66 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
         {/* Header */}
         <SheetHeader className="p-6 pb-4 border-b border-border shrink-0">
           <div className="flex items-start justify-between gap-4">
-            <div className="flex-1 space-y-2">
-              <SheetTitle className="text-2xl font-bold">{card.titulo}</SheetTitle>
-              <div className="flex flex-wrap gap-2">
-                {card.chatwoot_conversa_id && (
-                  <Badge variant="outline" className="text-xs">
-                    Conversa #{card.chatwoot_conversa_id}
-                  </Badge>
-                )}
-                {card.funil_nome && (
-                  <Badge variant="secondary" className="text-xs">
-                    {card.funil_nome}
-                  </Badge>
-                )}
-                {card.funil_etapa && (
-                  <Badge className="text-xs">
-                    {card.funil_etapa}
-                  </Badge>
+            {/* Avatares + Info */}
+            <div className="flex items-start gap-4 flex-1">
+              {/* Avatar do Lead (grande) com badge do responsável */}
+              <div className="relative">
+                <Avatar className="h-14 w-14 ring-2 ring-border shadow-sm">
+                  {card.avatar_lead_url ? (
+                    <AvatarImage src={card.avatar_lead_url} alt={card.titulo} />
+                  ) : null}
+                  <AvatarFallback className="bg-gradient-to-br from-primary/20 to-primary/40 text-primary font-semibold">
+                    {(card.titulo || 'L').substring(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Badge do responsável (pequeno no canto) */}
+                {responsavel?.avatar_url && (
+                  <Avatar className="h-6 w-6 absolute -bottom-1 -right-1 ring-2 ring-background shadow-sm">
+                    <AvatarImage src={responsavel.avatar_url} alt={responsavel.nome || ''} />
+                    <AvatarFallback className="bg-primary text-primary-foreground text-[10px]">
+                      {(responsavel.nome || 'U').substring(0, 1).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
                 )}
               </div>
+
+              {/* Info do Card e Responsável */}
+              <div className="flex-1 space-y-1.5">
+                <SheetTitle className="text-xl font-bold">{card.titulo}</SheetTitle>
+                
+                {/* Responsável */}
+                {responsavel && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <User className="h-3.5 w-3.5" />
+                    <span>{responsavel.nome || responsavel.email}</span>
+                    {responsavel.email && responsavel.nome && (
+                      <span className="text-xs opacity-75">({responsavel.email})</span>
+                    )}
+                  </div>
+                )}
+                
+                {/* Badges */}
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {card.chatwoot_conversa_id && (
+                    <Badge variant="outline" className="text-xs">
+                      Conversa #{card.chatwoot_conversa_id}
+                    </Badge>
+                  )}
+                  {card.funil_nome && (
+                    <Badge variant="secondary" className="text-xs">
+                      {card.funil_nome}
+                    </Badge>
+                  )}
+                  {card.funil_etapa && (
+                    <Badge className="text-xs">
+                      {card.funil_etapa}
+                    </Badge>
+                  )}
+                </div>
+              </div>
             </div>
+
+            {/* Ações */}
             <div className="flex gap-2 shrink-0">
               {card.chatwoot_conversa_id && (
                 <Button
@@ -513,7 +573,36 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
               {/* Tab Atividades */}
               <TabsContent value="atividades" className="flex-1 m-0 overflow-hidden">
                 <ScrollArea className="h-full">
-                  <div className="p-6 space-y-4">
+                  <div className="p-6 space-y-6">
+                    {/* Seção de Follow-ups */}
+                    <FollowUpSection
+                      atividades={atividades || []}
+                      onCreateFollowUp={async ({ tipo, descricao, dataPrevista }) => {
+                        if (!card) return;
+                        await createAtividade.mutateAsync({
+                          cardId: card.id,
+                          tipo,
+                          descricao,
+                          dataPrevista: dataPrevista?.toISOString(),
+                          sendToChatwoot: !!card.chatwoot_conversa_id,
+                          conversationId: card.chatwoot_conversa_id || undefined,
+                        });
+                      }}
+                      onCompleteFollowUp={async (id) => {
+                        await updateAtividade.mutateAsync({
+                          id,
+                          updates: {
+                            status: 'concluido',
+                            data_conclusao: new Date().toISOString(),
+                          },
+                        });
+                        toast.success("Follow-up concluído!");
+                      }}
+                      isCreating={createAtividade.isPending}
+                    />
+
+                    <Separator />
+
                     {/* Adicionar Nota Rápida */}
                     <div className="space-y-2">
                       <Label className="text-sm font-medium">Adicionar Nota</Label>
@@ -538,13 +627,19 @@ export const CardDetailsModal = ({ card, open, onOpenChange }: CardDetailsModalP
                     <Separator />
 
                     {/* Timeline de atividades */}
-                    {isLoadingAtividades ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        Carregando atividades...
-                      </div>
-                    ) : (
-                      <AtividadeTimeline atividades={atividades || []} />
-                    )}
+                    <div className="space-y-3">
+                      <h4 className="font-semibold text-sm flex items-center gap-2">
+                        <Activity className="h-4 w-4 text-primary" />
+                        Histórico de Atividades
+                      </h4>
+                      {isLoadingAtividades ? (
+                        <div className="text-center py-8 text-muted-foreground">
+                          Carregando atividades...
+                        </div>
+                      ) : (
+                        <AtividadeTimeline atividades={atividades || []} />
+                      )}
+                    </div>
                   </div>
                 </ScrollArea>
               </TabsContent>
