@@ -10,7 +10,8 @@ import { useChatwootContext } from "@/contexts/ChatwootContext";
 import { 
   getCardByConversationId, 
   createCardForConversation, 
-  moveCardToStage 
+  moveCardToStage,
+  enrichContactFromChatwoot,
 } from "@/services/cardLookupService";
 import { toast } from "sonner";
 
@@ -81,8 +82,20 @@ export const KanbanSelectorModal = ({ isOpen, onClose }: KanbanSelectorModalProp
         });
         toast.success(`Card movido para ${funil.nome} → ${etapa.nome}`);
       } else {
-        // Criar novo card
-        const titulo = contact?.name || `Conversa #${conversationId}`;
+        // Buscar dados enriquecidos do contato via API Chatwoot
+        let enrichedContact = null;
+        try {
+          enrichedContact = await enrichContactFromChatwoot(conversationId);
+        } catch (err) {
+          console.warn("[KanbanModal] Não foi possível enriquecer contato:", err);
+        }
+
+        // Usar dados enriquecidos OU fallback
+        const titulo = enrichedContact?.name || contact?.name || `Conversa #${conversationId}`;
+        const avatarUrl = enrichedContact?.avatar_url || contact?.avatar_url;
+        const telefone = enrichedContact?.phone || contact?.phone;
+
+        // Criar novo card com dados enriquecidos
         const newCard = await createCardForConversation({
           conversationId,
           titulo,
@@ -90,8 +103,8 @@ export const KanbanSelectorModal = ({ isOpen, onClose }: KanbanSelectorModalProp
           funilId: funil.id,
           funilNome: funil.nome,
           etapaNome: etapa.nome,
-          telefone: contact?.phone,
-          avatarUrl: contact?.avatar_url,
+          telefone,
+          avatarUrl,
         });
         cardId = newCard.id;
         toast.success(`Card criado em ${funil.nome} → ${etapa.nome}`);

@@ -1,6 +1,42 @@
 import { supabase } from "@/integrations/supabase/client";
 import type { CardConversa } from "@/types/database";
 
+export interface EnrichedContact {
+  name: string | null;
+  phone: string | null;
+  email: string | null;
+  avatar_url: string | null;
+}
+
+/**
+ * Busca dados enriquecidos do contato via API do Chatwoot
+ */
+export async function enrichContactFromChatwoot(conversationId: number): Promise<EnrichedContact | null> {
+  try {
+    console.log("[CardLookup] Enriquecendo contato para conversa:", conversationId);
+    
+    const { data, error } = await supabase.functions.invoke('get-chatwoot-contact', {
+      body: { conversationId }
+    });
+
+    if (error) {
+      console.warn("[CardLookup] Erro ao enriquecer contato:", error);
+      return null;
+    }
+
+    if (!data?.success) {
+      console.warn("[CardLookup] Resposta sem sucesso:", data?.error);
+      return null;
+    }
+
+    console.log("[CardLookup] Contato enriquecido:", data.contact);
+    return data.contact as EnrichedContact;
+  } catch (err) {
+    console.error("[CardLookup] Falha ao enriquecer contato:", err);
+    return null;
+  }
+}
+
 /**
  * Busca um card pelo ID da conversa do Chatwoot
  */
