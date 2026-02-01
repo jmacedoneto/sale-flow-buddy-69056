@@ -98,3 +98,34 @@ export const useCreateAtividade = () => {
     },
   });
 };
+
+export const useUpdateAtividade = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ 
+      id, 
+      updates 
+    }: { 
+      id: string; 
+      updates: Partial<AtividadeCard>;
+    }) => {
+      const { data, error } = await (supabase as any)
+        .from("atividades_cards")
+        .update(updates)
+        .eq("id", id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data as AtividadeCard;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["atividades"] });
+    },
+    onError: (error) => {
+      console.error("Erro ao atualizar atividade:", error);
+      toast.error("Erro ao atualizar atividade");
+    },
+  });
+};
