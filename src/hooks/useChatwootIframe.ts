@@ -6,6 +6,7 @@ export interface ChatwootContact {
   name: string;
   phone?: string;
   email?: string;
+  avatar_url?: string;
 }
 
 export interface ChatwootInboundMessage {

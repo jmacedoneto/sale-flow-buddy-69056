@@ -31,6 +31,7 @@ export async function createCardForConversation(params: {
   etapaNome: string;
   telefone?: string;
   email?: string;
+  avatarUrl?: string;
 }): Promise<CardConversa> {
   const { data, error } = await supabase
     .from("cards_conversas")
@@ -42,6 +43,7 @@ export async function createCardForConversation(params: {
       funil_nome: params.funilNome,
       funil_etapa: params.etapaNome,
       telefone_lead: params.telefone,
+      avatar_lead_url: params.avatarUrl,
       status: 'em_andamento',
       data_retorno: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
     })
