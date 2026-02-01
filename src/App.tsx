@@ -18,6 +18,7 @@ import DashboardAdministrativo from "./pages/DashboardAdministrativo";
 import Atividades from "./pages/Atividades";
 import Configuracoes from "./pages/Configuracoes";
 import NotFound from "./pages/NotFound";
+import ChatwootEmbed from "./pages/ChatwootEmbed";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const AppContent = () => {
         <Route path="/dashboard-administrativo" element={<ProtectedRoute><AppLayout><DashboardAdministrativo /></AppLayout></ProtectedRoute>} />
         <Route path="/atividades" element={<ProtectedRoute><AppLayout><Atividades /></AppLayout></ProtectedRoute>} />
         <Route path="/configuracoes" element={<ProtectedRoute><AppLayout><Configuracoes /></AppLayout></ProtectedRoute>} />
+        <Route path="/chatwoot-embed" element={<ChatwootEmbed />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
