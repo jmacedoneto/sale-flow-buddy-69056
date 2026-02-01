@@ -1,387 +1,185 @@
 
-# Plano: Correções da Integração Chatwoot + API para Agente IA
+# Plano: Correção de Card sem Nome/Foto + Verificação do Colapso
 
-## Resumo das Alterações
+## Diagnóstico dos Problemas
 
-Este plano resolve 3 problemas identificados e adiciona novos endpoints para automação com agentes IA:
+### Problema 1: Card sem Nome e Foto
+**Causa Raiz Identificada:**
+- Quando o Chatwoot abre o iframe e envia o `postMessage`, ele passa apenas o `conversationId`
+- O campo `contact` vem vazio ou incompleto do Chatwoot
+- O código atual usa `contact?.name || "Conversa #${conversationId}"`, resultando no fallback
+- A foto (avatar_url) também não é populada porque depende dos mesmos dados
 
-1. **Card sem nome/foto do contato** - Enriquecer dados ao criar card
-2. **Follow-up aparece mas precisa garantir `user_id`** - Garantir que o campo está preenchido
-3. **API expandida para agentes IA** - Novos endpoints HTTP para automação
-4. **Documentação atualizada** - Novos endpoints na aba API Docs
-
----
-
-## Parte 1: Corrigir Dados do Card (Nome e Avatar)
-
-### Problema Atual
-O `KanbanSelectorModal.tsx` cria cards usando `contact?.name` do `postMessage`, mas pode receber dados incompletos.
-
-### Solução
-Modificar o `cardLookupService.ts` para aceitar `avatarUrl` ao criar o card.
-
-**Arquivo:** `src/services/cardLookupService.ts`
-
-Modificações:
-- Adicionar parâmetro `avatarUrl?: string` na função `createCardForConversation`
-- Popular campo `avatar_lead_url` no insert
-
-**Arquivo:** `src/components/chatwoot/KanbanSelectorModal.tsx`
-
-Modificações:
-- Passar `avatarUrl: contact?.avatar_url` para o serviço
-
----
-
-## Parte 2: Garantir Follow-up com `user_id`
-
-### Diagnóstico
-O `createFollowUpActivity` já recebe `userId` como parâmetro opcional, mas precisamos garantir que está sempre preenchido quando disponível.
-
-**Arquivo:** `src/components/chatwoot/FollowUpModal.tsx`
-
-Verificar se `user?.id` está sendo passado corretamente (já está implementado na linha 87).
-
-O código atual já está correto:
+**Evidência no código:**
 ```typescript
-userId: user?.id,
+// KanbanSelectorModal.tsx - linha 85
+const titulo = contact?.name || `Conversa #${conversationId}`;
 ```
 
-Nenhuma modificação necessária neste arquivo.
+O `contact` depende do que o Chatwoot envia via postMessage, e se não vier, o card é criado com título genérico.
+
+### Problema 2: "Colapso" não aparece
+**Análise:**
+- O código da sidebar de filtros (`FiltersSidebar.tsx`) tem a funcionalidade de colapso implementada
+- O botão de toggle existe e funciona via localStorage
+- Possíveis causas: estado inicial, ou o usuário está se referindo a outra funcionalidade de collapse
 
 ---
 
-## Parte 3: Expandir API para Agentes IA
+## Solução Proposta
 
-### Novos Endpoints
+### Parte 1: Enriquecer Dados do Contato via API Chatwoot
 
-**Arquivo:** `supabase/functions/cards-api/index.ts`
+**Abordagem:** Quando o card for criado via iframe, buscar os dados do contato diretamente da API do Chatwoot usando o `conversationId`.
 
-Adicionar 4 novas actions:
+**Arquivo a criar:** `supabase/functions/get-chatwoot-contact/index.ts`
 
-| Action | Descrição | Parâmetros |
-|--------|-----------|------------|
-| `getByConversation` | Busca card por `chatwoot_conversa_id` | `conversationId` |
-| `createFromConversation` | Cria card vinculado a conversa Chatwoot | `conversationId, titulo, telefone?, avatarUrl?, funilId, etapaId` |
-| `createActivity` | Cria atividade/follow-up | `cardId? ou conversationId?, tipo, descricao, dataPrevista?, funilNome?` |
-| `listFunnels` | Lista todos os funis com etapas | nenhum |
+Esta Edge Function irá:
+1. Receber o `conversationId`
+2. Buscar os detalhes da conversa na API do Chatwoot
+3. Retornar os dados do contato (nome, telefone, avatar_url)
 
-### Lógica de Atividades
-- Se `funilNome` contém "comercial" → criar `FOLLOW_UP` com `data_prevista` (+3 dias úteis se não informada)
-- Senão → criar `NOTA_ADMIN` com `privado: true`
-
-### Estrutura das Novas Actions
-
-```typescript
-// getByConversation
-case 'getByConversation': {
-  const { conversationId } = body;
-  const { data: card } = await supabase
-    .from('cards_conversas')
-    .select('*')
-    .eq('chatwoot_conversa_id', conversationId)
-    .maybeSingle();
-  return { success: true, card };
-}
-
-// createFromConversation
-case 'createFromConversation': {
-  const { conversationId, titulo, telefone, avatarUrl, funilId, etapaId } = body;
-  
-  // Verificar se já existe
-  const { data: existing } = await supabase
-    .from('cards_conversas')
-    .select('id')
-    .eq('chatwoot_conversa_id', conversationId)
-    .maybeSingle();
-    
-  if (existing) {
-    return { success: false, error: 'Card já existe para esta conversa', cardId: existing.id };
+Estrutura:
+```text
+GET /get-chatwoot-contact
+Body: { conversationId: number }
+Response: { 
+  success: true, 
+  contact: {
+    name: string,
+    phone: string | null,
+    email: string | null,
+    avatar_url: string | null
   }
-  
-  // Buscar nomes do funil e etapa
-  const [funilRes, etapaRes] = await Promise.all([
-    supabase.from('funis').select('nome').eq('id', funilId).single(),
-    supabase.from('etapas').select('nome').eq('id', etapaId).single()
-  ]);
-  
-  // Criar card
-  const { data: card } = await supabase.from('cards_conversas').insert({
-    chatwoot_conversa_id: conversationId,
-    titulo: titulo || `Conversa #${conversationId}`,
-    telefone_lead: telefone,
-    avatar_lead_url: avatarUrl,
-    funil_id: funilId,
-    etapa_id: etapaId,
-    funil_nome: funilRes.data?.nome,
-    funil_etapa: etapaRes.data?.nome,
-    status: 'em_andamento',
-    data_retorno: addDays(new Date(), 7)
-  }).select().single();
-  
-  // Criar atividade de criação
-  await supabase.from('atividades_cards').insert({
-    card_id: card.id,
-    tipo: 'CRIACAO',
-    descricao: 'Card criado via API'
-  });
-  
-  return { success: true, card };
-}
-
-// createActivity
-case 'createActivity': {
-  const { cardId, conversationId, tipo, descricao, dataPrevista, funilNome } = body;
-  
-  // Resolver cardId se necessário
-  let resolvedCardId = cardId;
-  if (!resolvedCardId && conversationId) {
-    const { data: card } = await supabase
-      .from('cards_conversas')
-      .select('id, funil_nome')
-      .eq('chatwoot_conversa_id', conversationId)
-      .single();
-    resolvedCardId = card?.id;
-    // Usar funil_nome do card se não informado
-    if (!funilNome && card?.funil_nome) {
-      funilNome = card.funil_nome;
-    }
-  }
-  
-  if (!resolvedCardId) {
-    return { success: false, error: 'Card não encontrado' };
-  }
-  
-  // Determinar tipo baseado no funil
-  const isComercial = funilNome?.toLowerCase().includes('comercial');
-  const activityType = tipo || (isComercial ? 'FOLLOW_UP' : 'NOTA_ADMIN');
-  const isPrivate = !isComercial;
-  
-  // Calcular data prevista se comercial e não informada
-  let resolvedDataPrevista = dataPrevista;
-  if (isComercial && !dataPrevista) {
-    resolvedDataPrevista = addBusinessDays(new Date(), 3);
-  }
-  
-  const { data: activity } = await supabase.from('atividades_cards').insert({
-    card_id: resolvedCardId,
-    tipo: activityType,
-    descricao: descricao || `Atividade: ${activityType}`,
-    data_prevista: resolvedDataPrevista,
-    privado: isPrivate,
-    status: 'pendente'
-  }).select().single();
-  
-  // Atualizar data_retorno do card se comercial
-  if (isComercial && resolvedDataPrevista) {
-    await supabase.from('cards_conversas')
-      .update({ data_retorno: resolvedDataPrevista })
-      .eq('id', resolvedCardId);
-  }
-  
-  return { success: true, activity };
-}
-
-// listFunnels
-case 'listFunnels': {
-  const { data: funis } = await supabase
-    .from('funis')
-    .select('id, nome')
-    .eq('ativo', true)
-    .order('ordem');
-    
-  const funisWithEtapas = await Promise.all(funis.map(async (funil) => {
-    const { data: etapas } = await supabase
-      .from('etapas')
-      .select('id, nome, ordem, cor')
-      .eq('funil_id', funil.id)
-      .order('ordem');
-    return { ...funil, etapas };
-  }));
-  
-  return { success: true, funnels: funisWithEtapas };
 }
 ```
 
----
+**Arquivo a modificar:** `src/services/cardLookupService.ts`
 
-## Parte 4: Atualizar Documentação da API
+Adicionar função `enrichContactFromChatwoot`:
+- Chama a Edge Function para buscar dados do contato
+- Retorna os dados enriquecidos para uso no modal
 
-**Arquivo:** `src/components/AbaApiDocs.tsx`
+**Arquivo a modificar:** `src/components/chatwoot/KanbanSelectorModal.tsx`
 
-Adicionar novos endpoints na lista `endpoints`:
+Modificar `handleSelectStage`:
+- Antes de criar o card, chamar `enrichContactFromChatwoot(conversationId)`
+- Usar os dados retornados para popular `titulo` e `avatarUrl`
 
-```typescript
-{
-  method: "POST",
-  path: "/getByConversation",
-  description: "Busca card por ID da conversa Chatwoot",
-  body: { action: "getByConversation", conversationId: 4406 }
-},
-{
-  method: "POST",
-  path: "/createFromConversation",
-  description: "Cria card vinculado a uma conversa Chatwoot",
-  body: { 
-    action: "createFromConversation",
-    conversationId: 4406,
-    titulo: "João Silva",
-    telefone: "+5571999999999",
-    funilId: "uuid",
-    etapaId: "uuid"
-  }
-},
-{
-  method: "POST",
-  path: "/createActivity",
-  description: "Cria atividade/follow-up para um card",
-  body: { 
-    action: "createActivity",
-    conversationId: 4406,
-    tipo: "FOLLOW_UP",
-    descricao: "Retornar sobre proposta",
-    dataPrevista: "2026-02-05"
-  }
-},
-{
-  method: "POST",
-  path: "/listFunnels",
-  description: "Lista todos os funis e etapas disponíveis",
-  body: { action: "listFunnels" }
-}
-```
+### Parte 2: Verificar Sidebar Collapsed
 
-Adicionar seção de exemplos para agentes IA com curl commands.
+**Arquivo a verificar:** `src/pages/Dashboard.tsx`
+
+O estado `sidebarCollapsed` é gerenciado corretamente. Vou verificar se está sendo passado corretamente para o componente `FiltersSidebar`.
+
+Se o problema for visual (botão não visível), ajustar o styling do botão de toggle.
 
 ---
+
+## Arquivos a Criar
+
+| Arquivo | Descrição |
+|---------|-----------|
+| `supabase/functions/get-chatwoot-contact/index.ts` | Edge Function para buscar dados do contato via API Chatwoot |
 
 ## Arquivos a Modificar
 
 | Arquivo | Modificação |
 |---------|-------------|
-| `supabase/functions/cards-api/index.ts` | Adicionar 4 novas actions |
-| `src/services/cardLookupService.ts` | Adicionar `avatarUrl` ao criar card |
-| `src/components/chatwoot/KanbanSelectorModal.tsx` | Passar `avatarUrl` para o serviço |
-| `src/components/AbaApiDocs.tsx` | Documentar novos endpoints + exemplos IA |
+| `src/services/cardLookupService.ts` | Adicionar função `enrichContactFromChatwoot` |
+| `src/components/chatwoot/KanbanSelectorModal.tsx` | Usar dados enriquecidos ao criar card |
+| `src/pages/Dashboard.tsx` | Verificar passagem do estado collapsed (se necessário) |
 
 ---
 
-## Seção Técnica: Exemplos de Uso pelo Agente IA
+## Seção Técnica: Implementação
 
-### 1. Verificar se conversa já tem card
+### Nova Edge Function: get-chatwoot-contact
 
-```bash
-curl -X POST https://sjrmpojssvfgquroywys.supabase.co/functions/v1/cards-api \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sua_api_key" \
-  -d '{"action": "getByConversation", "conversationId": 4406}'
-```
-
-**Resposta:**
-```json
-{
-  "success": true,
-  "card": { "id": "uuid", "titulo": "João Silva", "funil_nome": "Comercial", ... }
-}
-```
-
-### 2. Criar card para conversa
-
-```bash
-curl -X POST https://sjrmpojssvfgquroywys.supabase.co/functions/v1/cards-api \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sua_api_key" \
-  -d '{
-    "action": "createFromConversation",
-    "conversationId": 4406,
-    "titulo": "João Silva",
-    "telefone": "+5571999999999",
-    "avatarUrl": "https://...",
-    "funilId": "uuid-do-funil",
-    "etapaId": "uuid-da-etapa"
-  }'
-```
-
-### 3. Criar follow-up comercial
-
-```bash
-curl -X POST https://sjrmpojssvfgquroywys.supabase.co/functions/v1/cards-api \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sua_api_key" \
-  -d '{
-    "action": "createActivity",
-    "conversationId": 4406,
-    "tipo": "FOLLOW_UP",
-    "descricao": "Retornar sobre proposta enviada",
-    "dataPrevista": "2026-02-05",
-    "funilNome": "Comercial"
-  }'
-```
-
-### 4. Criar nota administrativa (privada)
-
-```bash
-curl -X POST https://sjrmpojssvfgquroywys.supabase.co/functions/v1/cards-api \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sua_api_key" \
-  -d '{
-    "action": "createActivity",
-    "conversationId": 4406,
-    "descricao": "Cliente solicitou suporte técnico",
-    "funilNome": "Suporte"
-  }'
-```
-
-### 5. Listar funis disponíveis
-
-```bash
-curl -X POST https://sjrmpojssvfgquroywys.supabase.co/functions/v1/cards-api \
-  -H "Content-Type: application/json" \
-  -H "x-api-key: sua_api_key" \
-  -d '{"action": "listFunnels"}'
-```
-
-**Resposta:**
-```json
-{
-  "success": true,
-  "funnels": [
-    {
-      "id": "uuid-1",
-      "nome": "Comercial",
-      "etapas": [
-        { "id": "uuid-e1", "nome": "Novo Lead", "ordem": 1, "cor": "#3b82f6" },
-        { "id": "uuid-e2", "nome": "Qualificação", "ordem": 2, "cor": "#eab308" }
-      ]
+```typescript
+// Busca dados do contato da conversa no Chatwoot
+async function fetchConversationDetails(
+  baseUrl: string,
+  apiKey: string,
+  accountId: string,
+  conversationId: number
+) {
+  const url = `${baseUrl}/api/v1/accounts/${accountId}/conversations/${conversationId}`;
+  
+  const response = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'api_access_token': apiKey,
     },
-    {
-      "id": "uuid-2",
-      "nome": "Suporte",
-      "etapas": [...]
-    }
-  ]
+  });
+
+  if (!response.ok) {
+    throw new Error(`Erro ao buscar conversa: ${response.status}`);
+  }
+
+  const data = await response.json();
+  
+  // Extrair dados do contato do meta.sender
+  const sender = data.meta?.sender;
+  
+  return {
+    name: sender?.name || null,
+    phone: sender?.phone_number || null,
+    email: sender?.email || null,
+    avatar_url: sender?.thumbnail || null,
+  };
 }
 ```
 
----
+### Modificação no KanbanSelectorModal
 
-## Fluxo do Agente IA
+```typescript
+const handleSelectStage = async (funil, etapa) => {
+  // 1. Buscar dados enriquecidos do contato
+  let enrichedContact = null;
+  try {
+    enrichedContact = await enrichContactFromChatwoot(conversationId);
+  } catch (error) {
+    console.warn('[KanbanModal] Não foi possível enriquecer contato:', error);
+  }
+
+  // 2. Usar dados enriquecidos OU fallback
+  const titulo = enrichedContact?.name || contact?.name || `Conversa #${conversationId}`;
+  const avatarUrl = enrichedContact?.avatar_url || contact?.avatar_url;
+  const telefone = enrichedContact?.phone || contact?.phone;
+
+  // 3. Criar ou mover card com dados corretos
+  const newCard = await createCardForConversation({
+    conversationId,
+    titulo,
+    etapaId: etapa.id,
+    funilId: funil.id,
+    funilNome: funil.nome,
+    etapaNome: etapa.nome,
+    telefone,
+    avatarUrl,
+  });
+};
+```
+
+### Fluxo Completo
 
 ```text
-1. Recebe mensagem do cliente no Chatwoot
-2. Analisa conteúdo e decide criar card/follow-up
-3. Chama GET /listFunnels para obter IDs
-4. Chama POST /getByConversation para verificar se card existe
-5. Se não existe → POST /createFromConversation
-6. Chama POST /createActivity para agendar follow-up
-7. Responde ao cliente e registra no Chatwoot
+1. Chatwoot abre iframe → /chatwoot-embed
+2. Chatwoot envia postMessage com { conversationId: 3619 }
+3. Usuário clica em "Gerenciar no Kanban"
+4. Modal abre e busca card existente
+5. Se não existe, ao selecionar etapa:
+   a. Chama get-chatwoot-contact para buscar nome/avatar
+   b. Cria card com dados enriquecidos
+6. Card aparece no Kanban com nome e foto corretos
 ```
 
 ---
 
 ## Resultado Esperado
 
-1. Cards criados pelo iframe/API terão nome e foto do contato
-2. Follow-ups aparecerão corretamente na aba Atividades
-3. Agente IA poderá criar cards e atividades via HTTP requests
-4. Documentação completa na aba Configurações → API Docs
+1. Cards criados via iframe terão o nome real do contato do Chatwoot (ex: "João Silva" em vez de "Conversa #3619")
+2. Cards terão a foto do contato quando disponível
+3. Sidebar de filtros funcionará corretamente com o botão de colapso visível
